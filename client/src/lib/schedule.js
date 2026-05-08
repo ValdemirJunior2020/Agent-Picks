@@ -1,5 +1,5 @@
 // client/src/lib/schedule.js
-import { addDays, format, isBefore, setDay, setHours, setMinutes, setSeconds } from 'date-fns'
+import { addDays, format, isBefore, isSameDay, setDay, setHours, setMinutes, setSeconds } from 'date-fns'
 
 export const MEETINGS = [
   {
@@ -77,34 +77,61 @@ export const MEETINGS = [
   },
 ]
 
+function getMeetingDate(meeting, now = new Date()) {
+  let date = setDay(now, meeting.day, { weekStartsOn: 1 })
+  date = setSeconds(setMinutes(setHours(date, meeting.hour), meeting.minute), 0)
+
+  if (isBefore(date, now)) {
+    date = addDays(date, 7)
+  }
+
+  return date
+}
+
 export function getNextMeeting(now = new Date()) {
   const candidates = MEETINGS
     .filter((meeting) => meeting.autoPick === true)
-    .map((meeting) => {
-      let date = setDay(now, meeting.day, { weekStartsOn: 1 })
-      date = setSeconds(setMinutes(setHours(date, meeting.hour), meeting.minute), 0)
-
-      if (isBefore(date, now)) {
-        date = addDays(date, 7)
-      }
-
-      return {
-        ...meeting,
-        date,
-      }
-    })
+    .map((meeting) => ({
+      ...meeting,
+      date: getMeetingDate(meeting, now),
+    }))
     .sort((a, b) => a.date - b.date)
 
   return candidates[0]
+}
+
+export function getNextPickGroup(now = new Date()) {
+  const nextMeeting = getNextMeeting(now)
+
+  if (!nextMeeting) {
+    return {
+      date: null,
+      dayName: '',
+      meetings: [],
+    }
+  }
+
+  const meetings = MEETINGS
+    .filter((meeting) => meeting.autoPick === true)
+    .map((meeting) => ({
+      ...meeting,
+      date: getMeetingDate(meeting, now),
+    }))
+    .filter((meeting) => isSameDay(meeting.date, nextMeeting.date))
+    .sort((a, b) => a.date - b.date)
+
+  return {
+    date: nextMeeting.date,
+    dayName: nextMeeting.dayName,
+    meetings,
+  }
 }
 
 export function getTodayMeetings(now = new Date()) {
   const todayName = format(now, 'EEEE')
 
   return MEETINGS.filter(
-    (meeting) =>
-      meeting.dayName === todayName &&
-      meeting.autoPick === true
+    (meeting) => meeting.dayName === todayName && meeting.autoPick === true
   )
 }
 

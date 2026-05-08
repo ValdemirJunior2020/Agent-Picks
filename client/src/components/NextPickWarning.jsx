@@ -1,21 +1,21 @@
 // client/src/components/NextPickWarning.jsx
 import { AlertTriangle, CalendarClock } from 'lucide-react'
 
-export default function NextPickWarning({ nextMeeting }) {
-  if (!nextMeeting) return null
+export default function NextPickWarning({ nextPickGroup }) {
+  if (!nextPickGroup || !nextPickGroup.date || !nextPickGroup.meetings?.length) {
+    return null
+  }
 
-  const meetingDate =
-    nextMeeting.date instanceof Date
-      ? nextMeeting.date.toLocaleDateString('en-US', {
-          weekday: 'long',
-          month: 'long',
-          day: 'numeric',
-          year: 'numeric',
-        })
-      : nextMeeting.dayName || nextMeeting.day || 'Next meeting date'
+  const meetingDate = nextPickGroup.date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
 
-  const meetingTime = nextMeeting.time || 'scheduled time'
-  const callCenterName = nextMeeting.label || nextMeeting.center || 'Call Center Meeting'
+  const meetingText = nextPickGroup.meetings
+    .map((meeting) => `${meeting.label} at ${meeting.time}`)
+    .join(' and ')
 
   return (
     <div className="rounded-[1.5rem] border border-amber-400 bg-amber-100/95 p-4 text-amber-950 shadow-md backdrop-blur dark:border-amber-700 dark:bg-amber-950/70 dark:text-amber-100">
@@ -31,17 +31,13 @@ export default function NextPickWarning({ nextMeeting }) {
           </div>
 
           <p className="mt-1 text-base font-bold leading-relaxed">
-            Your next pick will be generated automatically on{' '}
+            Your next picks will be generated automatically on{' '}
             <span className="font-black text-rose-800 dark:text-rose-200">
               {meetingDate}
             </span>{' '}
-            at{' '}
-            <span className="font-black text-rose-800 dark:text-rose-200">
-              {meetingTime}
-            </span>{' '}
             for{' '}
             <span className="font-black text-rose-800 dark:text-rose-200">
-              {callCenterName}
+              {meetingText}
             </span>
             .
           </p>

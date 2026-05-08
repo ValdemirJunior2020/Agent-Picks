@@ -12,7 +12,12 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { fetchAgentRows } from './lib/api'
-import { formatCountdown, getNextMeeting, todayLabel } from './lib/schedule'
+import {
+  formatCountdown,
+  getNextMeeting,
+  getNextPickGroup,
+  todayLabel,
+} from './lib/schedule'
 import { generatePicks, normalizeRows } from './lib/picker'
 import DayCard from './components/DayCard'
 import AgentTable from './components/AgentTable'
@@ -22,18 +27,132 @@ import NextPickWarning from './components/NextPickWarning'
 const demoPayload = {
   success: true,
   rows: [
-    { sheetName: 'TEP QA', rowNumber: 57, values: ['Rhea May Primavera', 'W20 2/17/2025', 'Ginette Salvio', true, 'CS/35 needs work'] },
-    { sheetName: 'TEP QA', rowNumber: 58, values: ['Edmar Japson', 'W27 1/19/2026', 'Nicole C Demafelix', true, 'G/95 CS/98 great call'] },
-    { sheetName: 'TELUS', rowNumber: 12, values: ['Maria Santos', 'W24 6/1/2026', 'Barbara Kalchik', true, 'CS/82 TS needs coaching'] },
-    { sheetName: 'TELUS', rowNumber: 13, values: ['Joao Lima', 'W24 6/1/2026', 'Barbara Kalchik', true, 'CS/99 strong notes'] },
-    { sheetName: 'BU W QA', rowNumber: 65, values: ['Merliz Signey De Paz', 'W18 11/24/2024', 'Nicole C Demafelix', true, 'G/50 CS/50'] },
-    { sheetName: 'BU W QA', rowNumber: 67, values: ['Richard Martin Competente', 'W20 2/17/2025', 'Nicole C Demafelix', true, 'G/50 CS/85'] },
-    { sheetName: 'BU W QA', rowNumber: 71, values: ['Zeidreck Leariel Turalde', 'W26 9/28/2025', 'Nicole C Demafelix', true, 'G/98 CS/100 amazing'] },
-    { sheetName: 'WNS QA', rowNumber: 22, values: ['Ana Cruz', 'W25 9/22/2025', 'WNS Sup', true, 'G/78 CS/92 Questioning on Schedule'] },
-    { sheetName: 'WNS QA', rowNumber: 23, values: ['Carla Hope', 'W25 9/22/2025', 'WNS Sup', true, 'G/96 CS/96'] },
-    { sheetName: 'CON QA', rowNumber: 78, values: ['James Eduard Balandra', 'W17 11/10/2024', 'Norte, Christine Ann C', true, 'G/50 CS/16'] },
-    { sheetName: 'CON QA', rowNumber: 79, values: ['Jissa Basamot', 'W17 11/10/2024', 'Norte, Christine Ann C', true, 'G/100 CS/100'] },
-    { sheetName: 'CON QA', rowNumber: 80, values: ['Justin Arvee Vargas', 'W17 11/10/2024', 'Norte, Christine Ann C', true, 'G/85 CS/85 Questioning on Schedule sent EM 4/29'] },
+    {
+      sheetName: 'TEP QA',
+      rowNumber: 57,
+      values: [
+        'Rhea May Primavera',
+        'W20 2/17/2025',
+        'Ginette Salvio',
+        true,
+        'CS/35 needs work',
+      ],
+    },
+    {
+      sheetName: 'TEP QA',
+      rowNumber: 58,
+      values: [
+        'Edmar Japson',
+        'W27 1/19/2026',
+        'Nicole C Demafelix',
+        true,
+        'G/95 CS/98 great call',
+      ],
+    },
+    {
+      sheetName: 'TELUS',
+      rowNumber: 12,
+      values: [
+        'Maria Santos',
+        'W24 6/1/2026',
+        'Barbara Kalchik',
+        true,
+        'CS/82 TS needs coaching',
+      ],
+    },
+    {
+      sheetName: 'TELUS',
+      rowNumber: 13,
+      values: [
+        'Joao Lima',
+        'W24 6/1/2026',
+        'Barbara Kalchik',
+        true,
+        'CS/99 strong notes',
+      ],
+    },
+    {
+      sheetName: 'BU W QA',
+      rowNumber: 65,
+      values: [
+        'Merliz Signey De Paz',
+        'W18 11/24/2024',
+        'Nicole C Demafelix',
+        true,
+        'G/50 CS/50',
+      ],
+    },
+    {
+      sheetName: 'BU W QA',
+      rowNumber: 67,
+      values: [
+        'Richard Martin Competente',
+        'W20 2/17/2025',
+        'Nicole C Demafelix',
+        true,
+        'G/50 CS/85',
+      ],
+    },
+    {
+      sheetName: 'BU W QA',
+      rowNumber: 71,
+      values: [
+        'Zeidreck Leariel Turalde',
+        'W26 9/28/2025',
+        'Nicole C Demafelix',
+        true,
+        'G/98 CS/100 amazing',
+      ],
+    },
+    {
+      sheetName: 'WNS QA',
+      rowNumber: 22,
+      values: [
+        'Ana Cruz',
+        'W25 9/22/2025',
+        'WNS Sup',
+        true,
+        'G/78 CS/92 Questioning on Schedule',
+      ],
+    },
+    {
+      sheetName: 'WNS QA',
+      rowNumber: 23,
+      values: ['Carla Hope', 'W25 9/22/2025', 'WNS Sup', true, 'G/96 CS/96'],
+    },
+    {
+      sheetName: 'CON QA',
+      rowNumber: 78,
+      values: [
+        'James Eduard Balandra',
+        'W17 11/10/2024',
+        'Norte, Christine Ann C',
+        true,
+        'G/50 CS/16',
+      ],
+    },
+    {
+      sheetName: 'CON QA',
+      rowNumber: 79,
+      values: [
+        'Jissa Basamot',
+        'W17 11/10/2024',
+        'Norte, Christine Ann C',
+        true,
+        'G/100 CS/100',
+      ],
+    },
+    {
+      sheetName: 'CON QA',
+      rowNumber: 80,
+      values: [
+        'Justin Arvee Vargas',
+        'W17 11/10/2024',
+        'Norte, Christine Ann C',
+        true,
+        'G/85 CS/85 Questioning on Schedule sent EM 4/29',
+      ],
+    },
   ],
 }
 
@@ -46,12 +165,15 @@ function Stat({ icon: Icon, label, value, sub }) {
         </div>
         <span className="text-2xl">✝️</span>
       </div>
+
       <div className="mt-3 text-sm font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">
         {label}
       </div>
+
       <div className="font-serif text-3xl font-black text-stone-900 dark:text-stone-50">
         {value}
       </div>
+
       <div className="text-sm text-stone-600 dark:text-stone-300">{sub}</div>
     </div>
   )
@@ -84,9 +206,16 @@ export default function App() {
   const rows = useMemo(() => normalizeRows(payload), [payload])
   const picks = useMemo(() => generatePicks(rows), [rows])
   const nextMeeting = getNextMeeting(now)
+  const nextPickGroup = getNextPickGroup(now)
+
+  const qaPicks = useMemo(
+    () => picks.filter((pick) => pick.meeting.autoPick === true),
+    [picks]
+  )
 
   const badCs = rows.filter((r) => r.csScore != null && r.csScore < 90).length
   const badGroup = rows.filter((r) => r.groupScore != null && r.groupScore < 85).length
+
   const good = rows.filter(
     (r) =>
       (r.csScore == null || r.csScore >= 90) &&
@@ -97,6 +226,7 @@ export default function App() {
   async function loadLive() {
     setLoading(true)
     setError('')
+
     try {
       const data = await fetchAgentRows()
       setPayload(data)
@@ -123,17 +253,20 @@ export default function App() {
   const currentDayName = now.toLocaleDateString('en-US', { weekday: 'long' })
 
   const todaysPicks = useMemo(() => {
-    const list = picks.filter((p) => p.meeting.dayName === currentDayName)
+    const list = qaPicks.filter((p) => p.meeting.dayName === currentDayName)
+
     if (list.length > 0) return list
 
-    const upcoming = picks.find(
+    if (!nextMeeting) return []
+
+    const upcoming = qaPicks.find(
       (p) =>
         p.meeting.center === nextMeeting.center &&
         p.meeting.label === nextMeeting.label
     )
 
     return upcoming ? [upcoming] : []
-  }, [picks, currentDayName, nextMeeting])
+  }, [qaPicks, currentDayName, nextMeeting])
 
   return (
     <div
@@ -150,6 +283,7 @@ export default function App() {
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-700 to-rose-800 text-white shadow-lg">
                 <Cross className="h-7 w-7" />
               </div>
+
               <div>
                 <h1 className="font-serif text-3xl font-black leading-none">
                   Agent Picks
@@ -164,9 +298,13 @@ export default function App() {
               <div className="rounded-full border border-amber-200 bg-white/80 px-4 py-2 text-sm font-bold dark:border-stone-700 dark:bg-stone-900">
                 {todayLabel(now)}
               </div>
-              <div className="rounded-full bg-amber-800 px-4 py-2 text-sm font-bold text-white">
-                Next: {nextMeeting.label} in {formatCountdown(nextMeeting.date, now)}
-              </div>
+
+              {nextMeeting && (
+                <div className="rounded-full bg-amber-800 px-4 py-2 text-sm font-bold text-white">
+                  Next: {nextMeeting.label} in {formatCountdown(nextMeeting.date, now)}
+                </div>
+              )}
+
               <button
                 onClick={() => setDark(!dark)}
                 className="rounded-full border border-amber-200 bg-white/80 p-2 dark:border-stone-700 dark:bg-stone-900"
@@ -215,7 +353,7 @@ export default function App() {
           </aside>
 
           <section className="space-y-5">
-            <NextPickWarning nextMeeting={nextMeeting} />
+            <NextPickWarning nextPickGroup={nextPickGroup} />
 
             {error && (
               <div className="rounded-2xl border border-rose-300 bg-rose-50/88 p-4 font-semibold text-rose-900 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-100">
@@ -236,16 +374,41 @@ export default function App() {
                     icon={ShieldCheck}
                     label="Rows Loaded"
                     value={rows.length}
-                    sub={lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Demo/live data'}
+                    sub={
+                      lastUpdated
+                        ? `Updated ${lastUpdated.toLocaleTimeString()}`
+                        : 'Demo/live data'
+                    }
                   />
-                  <Stat icon={CalendarDays} label="Bad CS" value={badCs} sub="CS score below 90%" />
-                  <Stat icon={Wheat} label="Bad Group" value={badGroup} sub="Group score below 85%" />
-                  <Stat icon={Cross} label="Good Agents" value={good} sub="Green highlight candidates" />
+
+                  <Stat
+                    icon={CalendarDays}
+                    label="Bad CS"
+                    value={badCs}
+                    sub="CS score below 90%"
+                  />
+
+                  <Stat
+                    icon={Wheat}
+                    label="Bad Group"
+                    value={badGroup}
+                    sub="Group score below 85%"
+                  />
+
+                  <Stat
+                    icon={Cross}
+                    label="Good Agents"
+                    value={good}
+                    sub="Green highlight candidates"
+                  />
                 </div>
 
                 <div className="grid gap-5">
-                  {picks.map((pick) => (
-                    <DayCard key={`${pick.meeting.dayName}-${pick.meeting.label}`} pick={pick} />
+                  {qaPicks.map((pick) => (
+                    <DayCard
+                      key={`${pick.meeting.dayName}-${pick.meeting.label}`}
+                      pick={pick}
+                    />
                   ))}
                 </div>
               </>
@@ -268,6 +431,7 @@ export default function App() {
                 <p className="text-sm font-bold uppercase tracking-[0.25em] text-amber-800 dark:text-amber-200">
                   ⚙️ Settings
                 </p>
+
                 <h2 className="font-serif text-3xl font-black">
                   Google Sheet Connection
                 </h2>
