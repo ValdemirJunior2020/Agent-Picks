@@ -1,70 +1,167 @@
 // client/src/components/DayCard.jsx
-import { Clipboard, FileDown, UsersRound } from 'lucide-react'
+import { Clipboard, CalendarDays, FileDown } from 'lucide-react'
 import AgentCard from './AgentCard'
 
-function buildMeetingText(pick) {
-  const m = pick.meeting
-  if (pick.summaryOnly) {
-    return `${m.dayName} ${m.time} - ${m.label}\nRisk summary: ${pick.riskyCount} agents need attention.\n` +
-      pick.agents.map((a, i) => `${i + 1}. ${a.agentName} | ${a.center} | CS ${a.csScore ?? 'N/A'} | G ${a.groupScore ?? 'N/A'} | ${a.notes}`).join('\n')
+function getPickValue(pick, primary, fallback) {
+  return pick?.[primary] || pick?.[fallback] || null
+}
+
+function cleanNoteText(text = '') {
+  return String(text)
+    .replaceAll('bad CS', 'CS review')
+    .replaceAll('bad Group', 'Group review')
+    .replaceAll('bad agent', 'review pick')
+    .replaceAll('Bad CS', 'CS Review')
+    .replaceAll('Bad Group', 'Group Review')
+    .replaceAll('Bad Agent', 'Review Pick')
+    .replaceAll('BAD CS', 'CS REVIEW')
+    .replaceAll('BAD GROUP', 'GROUP REVIEW')
+    .replaceAll('BAD AGENT', 'REVIEW PICK')
+    .replaceAll('bad', 'review')
+    .replaceAll('Bad', 'Review')
+    .replaceAll('BAD', 'REVIEW')
+}
+
+function buildCopyText(pick) {
+  const csReview = getPickValue(pick, 'badCs', 'badCsAgent')
+  const groupReview = getPickValue(pick, 'badGroup', 'badGroupAgent')
+  const strongCs = pick?.bestGoodCs || pick?.goodAgents?.[0] || null
+  const strongGroup = pick?.bestGoodGroup || pick?.goodAgents?.[1] || null
+
+  const lines = []
+
+  lines.push(`Agent Picks - ${pick.meeting.label}`)
+  lines.push(`${pick.meeting.dayName} @ ${pick.meeting.time}`)
+  lines.push('')
+  lines.push('Important: This tool identifies QA records for review. It does not label agents as bad.')
+  lines.push('A low score may reflect one specific call issue, not the agent’s overall performance.')
+  lines.push('')
+  lines.push(`CS Review Pick: ${csReview?.agentName || 'Not found'}`)
+  lines.push(
+    `Group Review Pick: ${
+      pick.meeting.csOnly ? 'TELUS is CS only' : groupReview?.agentName || 'Not found'
+    }`
+  )
+  lines.push(`Strong CS Example: ${strongCs?.agentName || 'Not found'}`)
+  lines.push(
+    `Strong Group Example: ${
+      pick.meeting.csOnly ? 'TELUS is CS only' : strongGroup?.agentName || 'Not found'
+    }`
+  )
+
+  if (pick.notes?.length) {
+    lines.push('')
+    lines.push('Notes:')
+    pick.notes.forEach((note) => lines.push(`- ${cleanNoteText(note)}`))
   }
-  const lines = [`${m.dayName} ${m.time} - ${m.label}`, `Total agents read: ${pick.centerRowsCount}`]
-  if (pick.badCs) lines.push(`Bad CS Pick: ${pick.badCs.agentName} | CS ${pick.badCs.csScore ?? 'N/A'} | Row ${pick.badCs.rowNumber}`)
-  if (pick.badGroup) lines.push(`Bad Group Pick: ${pick.badGroup.agentName} | G ${pick.badGroup.groupScore ?? 'N/A'} | Row ${pick.badGroup.rowNumber}`)
-  if (m.csOnly) lines.push('Group Pick: TELUS is CS only')
-  pick.goodAgents.forEach((a, i) => lines.push(`Good Pick ${i + 1}: ${a.agentName} | CS ${a.csScore ?? 'N/A'} | G ${a.groupScore ?? 'N/A'} | Row ${a.rowNumber}`))
-  pick.notes.forEach((n) => lines.push(`Note: ${n}`))
+
   return lines.join('\n')
 }
 
 export default function DayCard({ pick }) {
-  const copy = async () => navigator.clipboard.writeText(buildMeetingText(pick))
-  const print = () => window.print()
+  if (!pick?.meeting) return null
 
-  if (pick.summaryOnly) {
-    return (
-      <section className="rounded-[2rem] border border-amber-200 bg-amber-50/90 p-5 shadow-holy backdrop-blur dark:border-stone-700 dark:bg-stone-900/75">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.25em] text-amber-800 dark:text-amber-200">{pick.meeting.emoji} {pick.meeting.dayName} • {pick.meeting.time}</p>
-            <h2 className="font-serif text-2xl font-black text-stone-900 dark:text-stone-50">{pick.meeting.label}</h2>
-            <p className="text-stone-700 dark:text-stone-300">Summary only. {pick.riskyCount} agents currently need attention across all centers.</p>
-          </div>
-          <button onClick={copy} className="rounded-full bg-amber-800 px-4 py-2 text-sm font-bold text-white shadow hover:bg-amber-900"><Clipboard className="mr-2 inline h-4 w-4" />Copy Summary</button>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {pick.agents.map((agent) => <AgentCard key={agent.id} title={`${agent.center} Risk`} agent={agent} tone="red" />)}
-        </div>
-      </section>
-    )
+  const csReview = getPickValue(pick, 'badCs', 'badCsAgent')
+  const groupReview = getPickValue(pick, 'badGroup', 'badGroupAgent')
+  const strongCs = pick.bestGoodCs || pick.goodAgents?.[0] || null
+  const strongGroup = pick.bestGoodGroup || pick.goodAgents?.[1] || null
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(buildCopyText(pick))
+  }
+
+  const handlePdf = () => {
+    window.print()
   }
 
   return (
-    <section className="rounded-[2rem] border border-amber-200 bg-stone-50/90 p-5 shadow-holy backdrop-blur dark:border-stone-700 dark:bg-stone-900/75">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <section className="rounded-[2rem] border border-amber-200 bg-stone-50/84 p-5 shadow-xl backdrop-blur-md dark:border-stone-700 dark:bg-stone-900/72">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[0.25em] text-amber-800 dark:text-amber-200">{pick.meeting.emoji} {pick.meeting.dayName} • {pick.meeting.time}</p>
-          <h2 className="font-serif text-2xl font-black text-stone-900 dark:text-stone-50">{pick.meeting.label}</h2>
-          <p className="mt-1 flex items-center gap-2 text-sm text-stone-600 dark:text-stone-300"><UsersRound className="h-4 w-4" /> {pick.centerRowsCount} agents found from Google Sheets</p>
+          <p className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.25em] text-amber-800 dark:text-amber-200">
+            <CalendarDays className="h-4 w-4" />
+            {pick.meeting.dayName} • {pick.meeting.time}
+          </p>
+
+          <h2 className="font-serif text-3xl font-black text-stone-900 dark:text-stone-50">
+            {pick.meeting.label}
+          </h2>
+
+          <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">
+            {pick.centerRowsCount ?? pick.agentsCount ?? 0} records found from Google Sheets
+          </p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={copy} className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-bold text-white shadow hover:bg-emerald-800"><Clipboard className="mr-2 inline h-4 w-4" />Copy</button>
-          <button onClick={print} className="rounded-full bg-rose-700 px-4 py-2 text-sm font-bold text-white shadow hover:bg-rose-800"><FileDown className="mr-2 inline h-4 w-4" />PDF</button>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={handleCopy}
+            className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-black text-white shadow hover:bg-emerald-800"
+          >
+            <Clipboard className="mr-2 inline h-4 w-4" />
+            Copy
+          </button>
+
+          <button
+            onClick={handlePdf}
+            className="rounded-full bg-rose-700 px-4 py-2 text-sm font-black text-white shadow hover:bg-rose-800"
+          >
+            <FileDown className="mr-2 inline h-4 w-4" />
+            PDF
+          </button>
         </div>
       </div>
-      {pick.notes.length > 0 && <div className="mt-4 rounded-2xl border border-amber-300 bg-amber-100/80 p-3 text-sm font-semibold text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">{pick.notes.join(' ')}</div>}
+
       <div className="mt-5 grid gap-4 xl:grid-cols-2">
-        <AgentCard title="Bad CS Agent" agent={pick.badCs} tone="red" />
-        {pick.meeting.csOnly ? <AgentCard title="Bad Group Agent" tone="neutral" note="TELUS is CS only." /> : <AgentCard title="Bad Group Agent" agent={pick.badGroup} tone="red" />}
-        {pick.goodAgents.map((agent, index) => (
-  <AgentCard
-    key={`${agent.id}-${index}`}
-    title={index === 0 ? 'Best Good CS Pick' : 'Best Good Group Pick'}
-    agent={agent}
-    tone="green"
-  />
-))}
+        <AgentCard
+          title="CS Review Pick"
+          agent={csReview}
+          tone="red"
+          note="No CS review pick found."
+        />
+
+        {pick.meeting.csOnly ? (
+          <AgentCard
+            title="Group Review Pick"
+            tone="neutral"
+            note="TELUS is CS only."
+          />
+        ) : (
+          <AgentCard
+            title="Group Review Pick"
+            agent={groupReview}
+            tone="red"
+            note="No Group review pick found."
+          />
+        )}
+
+        <AgentCard
+          title="Strong CS Example"
+          agent={strongCs}
+          tone="green"
+          note="No strong CS example found."
+        />
+
+        {pick.meeting.csOnly ? (
+          <AgentCard
+            title="Strong Group Example"
+            tone="neutral"
+            note="TELUS is CS only."
+          />
+        ) : (
+          <AgentCard
+            title="Strong Group Example"
+            agent={strongGroup}
+            tone="green"
+            note="No strong Group example found."
+          />
+        )}
       </div>
+
+      {pick.notes?.length > 0 && (
+        <div className="mt-5 rounded-2xl border border-amber-300 bg-amber-100/80 p-4 text-sm font-semibold text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          {cleanNoteText(pick.notes.join(' '))}
+        </div>
+      )}
     </section>
   )
 }

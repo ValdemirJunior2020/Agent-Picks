@@ -30,90 +30,42 @@ const demoPayload = {
     {
       sheetName: 'TEP QA',
       rowNumber: 57,
-      values: [
-        'Rhea May Primavera',
-        'W20 2/17/2025',
-        'Ginette Salvio',
-        true,
-        'CS/35 needs work',
-      ],
+      values: ['Rhea May Primavera', 'W20 2/17/2025', 'Ginette Salvio', true, 'CS/35 needs work'],
     },
     {
       sheetName: 'TEP QA',
       rowNumber: 58,
-      values: [
-        'Edmar Japson',
-        'W27 1/19/2026',
-        'Nicole C Demafelix',
-        true,
-        'G/95 CS/98 great call',
-      ],
+      values: ['Edmar Japson', 'W27 1/19/2026', 'Nicole C Demafelix', true, 'G/95 CS/98 great call'],
     },
     {
       sheetName: 'TELUS',
       rowNumber: 12,
-      values: [
-        'Maria Santos',
-        'W24 6/1/2026',
-        'Barbara Kalchik',
-        true,
-        'CS/82 TS needs coaching',
-      ],
+      values: ['Maria Santos', 'W24 6/1/2026', 'Barbara Kalchik', true, 'CS/82 TS needs coaching'],
     },
     {
       sheetName: 'TELUS',
       rowNumber: 13,
-      values: [
-        'Joao Lima',
-        'W24 6/1/2026',
-        'Barbara Kalchik',
-        true,
-        'CS/99 strong notes',
-      ],
+      values: ['Joao Lima', 'W24 6/1/2026', 'Barbara Kalchik', true, 'CS/99 strong notes'],
     },
     {
       sheetName: 'BU W QA',
       rowNumber: 65,
-      values: [
-        'Merliz Signey De Paz',
-        'W18 11/24/2024',
-        'Nicole C Demafelix',
-        true,
-        'G/50 CS/50',
-      ],
+      values: ['Merliz Signey De Paz', 'W18 11/24/2024', 'Nicole C Demafelix', true, 'G/50 CS/50'],
     },
     {
       sheetName: 'BU W QA',
       rowNumber: 67,
-      values: [
-        'Richard Martin Competente',
-        'W20 2/17/2025',
-        'Nicole C Demafelix',
-        true,
-        'G/50 CS/85',
-      ],
+      values: ['Richard Martin Competente', 'W20 2/17/2025', 'Nicole C Demafelix', true, 'G/50 CS/85'],
     },
     {
       sheetName: 'BU W QA',
       rowNumber: 71,
-      values: [
-        'Zeidreck Leariel Turalde',
-        'W26 9/28/2025',
-        'Nicole C Demafelix',
-        true,
-        'G/98 CS/100 amazing',
-      ],
+      values: ['Zeidreck Leariel Turalde', 'W26 9/28/2025', 'Nicole C Demafelix', true, 'G/98 CS/100 amazing'],
     },
     {
       sheetName: 'WNS QA',
       rowNumber: 22,
-      values: [
-        'Ana Cruz',
-        'W25 9/22/2025',
-        'WNS Sup',
-        true,
-        'G/78 CS/92 Questioning on Schedule',
-      ],
+      values: ['Ana Cruz', 'W25 9/22/2025', 'WNS Sup', true, 'G/78 CS/92 Questioning on Schedule'],
     },
     {
       sheetName: 'WNS QA',
@@ -123,35 +75,17 @@ const demoPayload = {
     {
       sheetName: 'CON QA',
       rowNumber: 78,
-      values: [
-        'James Eduard Balandra',
-        'W17 11/10/2024',
-        'Norte, Christine Ann C',
-        true,
-        'G/50 CS/16',
-      ],
+      values: ['James Eduard Balandra', 'W17 11/10/2024', 'Norte, Christine Ann C', true, 'G/50 CS/16'],
     },
     {
       sheetName: 'CON QA',
       rowNumber: 79,
-      values: [
-        'Jissa Basamot',
-        'W17 11/10/2024',
-        'Norte, Christine Ann C',
-        true,
-        'G/100 CS/100',
-      ],
+      values: ['Jissa Basamot', 'W17 11/10/2024', 'Norte, Christine Ann C', true, 'G/100 CS/100'],
     },
     {
       sheetName: 'CON QA',
       rowNumber: 80,
-      values: [
-        'Justin Arvee Vargas',
-        'W17 11/10/2024',
-        'Norte, Christine Ann C',
-        true,
-        'G/85 CS/85 Questioning on Schedule sent EM 4/29',
-      ],
+      values: ['Justin Arvee Vargas', 'W17 11/10/2024', 'Norte, Christine Ann C', true, 'G/85 CS/85 Questioning on Schedule sent EM 4/29'],
     },
   ],
 }
@@ -213,10 +147,10 @@ export default function App() {
     [picks]
   )
 
-  const badCs = rows.filter((r) => r.csScore != null && r.csScore < 90).length
-  const badGroup = rows.filter((r) => r.groupScore != null && r.groupScore < 85).length
+  const csReviewNeeded = rows.filter((r) => r.csScore != null && r.csScore < 90).length
+  const groupReviewNeeded = rows.filter((r) => r.groupScore != null && r.groupScore < 85).length
 
-  const good = rows.filter(
+  const strongExamples = rows.filter(
     (r) =>
       (r.csScore == null || r.csScore >= 90) &&
       (r.groupScore == null || r.groupScore >= 85) &&
@@ -256,7 +190,6 @@ export default function App() {
     const list = qaPicks.filter((p) => p.meeting.dayName === currentDayName)
 
     if (list.length > 0) return list
-
     if (!nextMeeting) return []
 
     const upcoming = qaPicks.find(
@@ -289,7 +222,7 @@ export default function App() {
                   Agent Picks
                 </h1>
                 <p className="text-sm font-semibold text-stone-600 dark:text-stone-300">
-                  QA Call Center Tool for Barbara Kalchik • “Let all things be done decently and in order.”
+                  QA Call Center Tool for Barbara Kalchik • Review picks, not agent labels.
                 </p>
               </div>
             </div>
@@ -321,7 +254,7 @@ export default function App() {
               <div className="text-2xl">🕊️</div>
               <p className="font-serif text-xl font-black">Warm QA View</p>
               <p className="text-sm opacity-90">
-                Smart weekly picks from your Google Sheet.
+                Smart review picks from your Google Sheet.
               </p>
             </div>
 
@@ -355,6 +288,11 @@ export default function App() {
           <section className="space-y-5">
             <NextPickWarning nextPickGroup={nextPickGroup} />
 
+            <div className="rounded-[1.5rem] border border-emerald-300 bg-emerald-50/90 p-4 text-sm font-semibold text-emerald-950 shadow-sm backdrop-blur dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
+              This tool does not label agents as bad. It identifies calls or QA records that may need review.
+              A low score may reflect one specific call issue, not the agent’s overall performance.
+            </div>
+
             {error && (
               <div className="rounded-2xl border border-rose-300 bg-rose-50/88 p-4 font-semibold text-rose-900 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-100">
                 Live sheet not connected yet: {error}. Showing demo data until your Apps Script URL is added.
@@ -363,7 +301,7 @@ export default function App() {
 
             {loading && (
               <div className="rounded-2xl border border-amber-300 bg-amber-100/90 p-4 font-bold text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-                ✨ Reading Google Sheets, checking KPI scores, scanning notes, and preparing Barbara&apos;s meeting picks...
+                ✨ Reading Google Sheets, checking KPI scores, scanning notes, and preparing Barbara&apos;s review picks...
               </div>
             )}
 
@@ -383,22 +321,22 @@ export default function App() {
 
                   <Stat
                     icon={CalendarDays}
-                    label="Bad CS"
-                    value={badCs}
-                    sub="CS score below 90%"
+                    label="CS Review Needed"
+                    value={csReviewNeeded}
+                    sub="CS records below 90%"
                   />
 
                   <Stat
                     icon={Wheat}
-                    label="Bad Group"
-                    value={badGroup}
-                    sub="Group score below 85%"
+                    label="Group Review Needed"
+                    value={groupReviewNeeded}
+                    sub="Group records below 85%"
                   />
 
                   <Stat
                     icon={Cross}
-                    label="Good Agents"
-                    value={good}
+                    label="Strong Examples"
+                    value={strongExamples}
                     sub="Green highlight candidates"
                   />
                 </div>
