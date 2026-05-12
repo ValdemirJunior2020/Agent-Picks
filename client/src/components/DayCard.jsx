@@ -22,6 +22,41 @@ function cleanNoteText(text = '') {
     .replaceAll('BAD', 'REVIEW')
 }
 
+<<<<<<< HEAD
+function buildCopyText(pick) {
+  const csReview = getPickValue(pick, 'badCs', 'badCsAgent')
+  const groupReview = getPickValue(pick, 'badGroup', 'badGroupAgent')
+  const strongCs = pick?.bestGoodCs || pick?.goodAgents?.[0] || null
+  const strongGroup = pick?.bestGoodGroup || pick?.goodAgents?.[1] || null
+
+  const lines = []
+
+  lines.push(`Agent Picks - ${pick.meeting.label}`)
+  lines.push(`${pick.meeting.dayName} @ ${pick.meeting.time}`)
+  lines.push('')
+  lines.push('Important: This tool identifies QA records for review. It does not label agents as bad.')
+  lines.push('A low score may reflect one specific call issue, not the agent’s overall performance.')
+  lines.push('')
+  lines.push(`CS Review Pick: ${csReview?.agentName || 'Not found'}`)
+  lines.push(
+    `Group Review Pick: ${
+      pick.meeting.csOnly ? 'TELUS is CS only' : groupReview?.agentName || 'Not found'
+    }`
+  )
+  lines.push(`Strong CS Example: ${strongCs?.agentName || 'Not found'}`)
+  lines.push(
+    `Strong Group Example: ${
+      pick.meeting.csOnly ? 'TELUS is CS only' : strongGroup?.agentName || 'Not found'
+    }`
+  )
+
+  if (pick.notes?.length) {
+    lines.push('')
+    lines.push('Notes:')
+    pick.notes.forEach((note) => lines.push(`- ${cleanNoteText(note)}`))
+  }
+
+=======
 function buildAgentCopyLine(agent) {
   return [
     agent?.agentName || 'N/A',
@@ -62,6 +97,7 @@ function buildCopyText(pick) {
     lines.push(buildAgentCopyLine(agent))
   })
 
+>>>>>>> 774db9c (Update project files)
   return lines.join('\n')
 }
 
