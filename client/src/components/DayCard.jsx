@@ -22,41 +22,6 @@ function cleanNoteText(text = '') {
     .replaceAll('BAD', 'REVIEW')
 }
 
-<<<<<<< HEAD
-function buildCopyText(pick) {
-  const csReview = getPickValue(pick, 'badCs', 'badCsAgent')
-  const groupReview = getPickValue(pick, 'badGroup', 'badGroupAgent')
-  const strongCs = pick?.bestGoodCs || pick?.goodAgents?.[0] || null
-  const strongGroup = pick?.bestGoodGroup || pick?.goodAgents?.[1] || null
-
-  const lines = []
-
-  lines.push(`Agent Picks - ${pick.meeting.label}`)
-  lines.push(`${pick.meeting.dayName} @ ${pick.meeting.time}`)
-  lines.push('')
-  lines.push('Important: This tool identifies QA records for review. It does not label agents as bad.')
-  lines.push('A low score may reflect one specific call issue, not the agent’s overall performance.')
-  lines.push('')
-  lines.push(`CS Review Pick: ${csReview?.agentName || 'Not found'}`)
-  lines.push(
-    `Group Review Pick: ${
-      pick.meeting.csOnly ? 'TELUS is CS only' : groupReview?.agentName || 'Not found'
-    }`
-  )
-  lines.push(`Strong CS Example: ${strongCs?.agentName || 'Not found'}`)
-  lines.push(
-    `Strong Group Example: ${
-      pick.meeting.csOnly ? 'TELUS is CS only' : strongGroup?.agentName || 'Not found'
-    }`
-  )
-
-  if (pick.notes?.length) {
-    lines.push('')
-    lines.push('Notes:')
-    pick.notes.forEach((note) => lines.push(`- ${cleanNoteText(note)}`))
-  }
-
-=======
 function buildAgentCopyLine(agent) {
   return [
     agent?.agentName || 'N/A',
@@ -78,7 +43,9 @@ function buildCopyText(pick) {
   const seen = new Set()
 
   selectedAgents.forEach((agent) => {
-    const key = agent?.id || `${agent?.agentName}-${agent?.startDate}-${agent?.supervisor}`
+    const key =
+      agent?.id ||
+      `${agent?.agentName}-${agent?.startDate}-${agent?.supervisor}`
 
     if (!seen.has(key)) {
       seen.add(key)
@@ -86,7 +53,13 @@ function buildCopyText(pick) {
     }
   })
 
-  const lines = ['Groups and CS Choices for the Day:']
+  const lines = [
+    'Here is the choice for the QA meeting today.',
+    '',
+    'Please provide the past three (3) QA scores with call IDs for each LOB for this agent.',
+    '',
+    'Groups and CS Choices for the Day:',
+  ]
 
   if (!uniqueAgents.length) {
     lines.push('No CS or Group choice found.')
@@ -97,7 +70,6 @@ function buildCopyText(pick) {
     lines.push(buildAgentCopyLine(agent))
   })
 
->>>>>>> 774db9c (Update project files)
   return lines.join('\n')
 }
 
@@ -110,7 +82,8 @@ export default function DayCard({ pick }) {
   const strongGroup = pick.bestGoodGroup || pick.goodAgents?.[1] || null
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(buildCopyText(pick))
+    const textToCopy = buildCopyText(pick)
+    await navigator.clipboard.writeText(textToCopy)
   }
 
   const handlePdf = () => {
