@@ -22,38 +22,45 @@ function cleanNoteText(text = '') {
     .replaceAll('BAD', 'REVIEW')
 }
 
+function buildAgentCopyLine(agent) {
+  return [
+    agent?.agentName || 'N/A',
+    agent?.startDate || 'N/A',
+    agent?.supervisor || 'N/A',
+  ].join('\t')
+}
+
 function buildCopyText(pick) {
   const csReview = getPickValue(pick, 'badCs', 'badCsAgent')
   const groupReview = getPickValue(pick, 'badGroup', 'badGroupAgent')
-  const strongCs = pick?.bestGoodCs || pick?.goodAgents?.[0] || null
-  const strongGroup = pick?.bestGoodGroup || pick?.goodAgents?.[1] || null
 
-  const lines = []
+  const selectedAgents = [
+    csReview,
+    pick?.meeting?.csOnly ? null : groupReview,
+  ].filter(Boolean)
 
-  lines.push(`Agent Picks - ${pick.meeting.label}`)
-  lines.push(`${pick.meeting.dayName} @ ${pick.meeting.time}`)
-  lines.push('')
-  lines.push('Important: This tool identifies QA records for review. It does not label agents as bad.')
-  lines.push('A low score may reflect one specific call issue, not the agent’s overall performance.')
-  lines.push('')
-  lines.push(`CS Review Pick: ${csReview?.agentName || 'Not found'}`)
-  lines.push(
-    `Group Review Pick: ${
-      pick.meeting.csOnly ? 'TELUS is CS only' : groupReview?.agentName || 'Not found'
-    }`
-  )
-  lines.push(`Strong CS Example: ${strongCs?.agentName || 'Not found'}`)
-  lines.push(
-    `Strong Group Example: ${
-      pick.meeting.csOnly ? 'TELUS is CS only' : strongGroup?.agentName || 'Not found'
-    }`
-  )
+  const uniqueAgents = []
+  const seen = new Set()
 
-  if (pick.notes?.length) {
-    lines.push('')
-    lines.push('Notes:')
-    pick.notes.forEach((note) => lines.push(`- ${cleanNoteText(note)}`))
+  selectedAgents.forEach((agent) => {
+    const key = agent?.id || `${agent?.agentName}-${agent?.startDate}-${agent?.supervisor}`
+
+    if (!seen.has(key)) {
+      seen.add(key)
+      uniqueAgents.push(agent)
+    }
+  })
+
+  const lines = ['Groups and CS Choices for the Day:']
+
+  if (!uniqueAgents.length) {
+    lines.push('No CS or Group choice found.')
+    return lines.join('\n')
   }
+
+  uniqueAgents.forEach((agent) => {
+    lines.push(buildAgentCopyLine(agent))
+  })
 
   return lines.join('\n')
 }
