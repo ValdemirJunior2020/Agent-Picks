@@ -24,6 +24,8 @@ import AgentTable from './components/AgentTable'
 import TodaySpotlight from './components/TodaySpotlight'
 import NextPickWarning from './components/NextPickWarning'
 
+const QA_DAYS = ['Tuesday', 'Wednesday', 'Thursday', 'Friday']
+
 const demoPayload = {
   success: true,
   rows: [
@@ -113,6 +115,32 @@ function Stat({ icon: Icon, label, value, sub }) {
   )
 }
 
+function timeToMinutes(timeString = '') {
+  const match = String(timeString).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+
+  if (!match) return 0
+
+  let hour = Number(match[1])
+  const minute = Number(match[2])
+  const ampm = match[3].toUpperCase()
+
+  if (ampm === 'PM' && hour !== 12) hour += 12
+  if (ampm === 'AM' && hour === 12) hour = 0
+
+  return hour * 60 + minute
+}
+
+function getDayPriority(dayName, currentDayName) {
+  const currentIndex = QA_DAYS.indexOf(currentDayName)
+  const dayIndex = QA_DAYS.indexOf(dayName)
+
+  if (dayIndex === -1) return 999
+  if (currentIndex === -1) return dayIndex
+
+  const diff = (dayIndex - currentIndex + QA_DAYS.length) % QA_DAYS.length
+  return diff
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('overview')
   const [dark, setDark] = useState(false)
@@ -146,6 +174,27 @@ export default function App() {
     () => picks.filter((pick) => pick.meeting.autoPick === true),
     [picks]
   )
+
+  const currentDayName = now.toLocaleDateString('en-US', { weekday: 'long' })
+
+  const orderedQaPicks = useMemo(() => {
+    return [...qaPicks].sort((a, b) => {
+      const aDay = a?.meeting?.dayName || a?.meeting?.day || ''
+      const bDay = b?.meeting?.dayName || b?.meeting?.day || ''
+
+      const aDayPriority = getDayPriority(aDay, currentDayName)
+      const bDayPriority = getDayPriority(bDay, currentDayName)
+
+      if (aDayPriority !== bDayPriority) {
+        return aDayPriority - bDayPriority
+      }
+
+      const aTime = timeToMinutes(a?.meeting?.time || '')
+      const bTime = timeToMinutes(b?.meeting?.time || '')
+
+      return aTime - bTime
+    })
+  }, [qaPicks, currentDayName])
 
   const csReviewNeeded = rows.filter((r) => r.csScore != null && r.csScore < 90).length
   const groupReviewNeeded = rows.filter((r) => r.groupScore != null && r.groupScore < 85).length
@@ -183,8 +232,6 @@ export default function App() {
     { id: 'agents', label: 'All Agents', icon: Table2 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ]
-
-  const currentDayName = now.toLocaleDateString('en-US', { weekday: 'long' })
 
   const todaysPicks = useMemo(() => {
     const list = qaPicks.filter((p) => p.meeting.dayName === currentDayName)
@@ -342,7 +389,7 @@ export default function App() {
                 </div>
 
                 <div className="grid gap-5">
-                  {qaPicks.map((pick) => (
+                  {orderedQaPicks.map((pick) => (
                     <DayCard
                       key={`${pick.meeting.dayName}-${pick.meeting.label}`}
                       pick={pick}
