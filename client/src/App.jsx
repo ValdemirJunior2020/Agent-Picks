@@ -137,12 +137,11 @@ function getDayPriority(dayName, currentDayName) {
   if (dayIndex === -1) return 999
   if (currentIndex === -1) return dayIndex
 
-  const diff = (dayIndex - currentIndex + QA_DAYS.length) % QA_DAYS.length
-  return diff
+  return (dayIndex - currentIndex + QA_DAYS.length) % QA_DAYS.length
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState('daily')
   const [dark, setDark] = useState(false)
   const [payload, setPayload] = useState(demoPayload)
   const [loading, setLoading] = useState(false)
@@ -189,12 +188,24 @@ export default function App() {
         return aDayPriority - bDayPriority
       }
 
-      const aTime = timeToMinutes(a?.meeting?.time || '')
-      const bTime = timeToMinutes(b?.meeting?.time || '')
-
-      return aTime - bTime
+      return timeToMinutes(a?.meeting?.time || '') - timeToMinutes(b?.meeting?.time || '')
     })
   }, [qaPicks, currentDayName])
+
+  const todaysPicks = useMemo(() => {
+    const list = qaPicks.filter((p) => p.meeting.dayName === currentDayName)
+
+    if (list.length > 0) return list
+    if (!nextMeeting) return []
+
+    const upcoming = qaPicks.find(
+      (p) =>
+        p.meeting.center === nextMeeting.center &&
+        p.meeting.label === nextMeeting.label
+    )
+
+    return upcoming ? [upcoming] : []
+  }, [qaPicks, currentDayName, nextMeeting])
 
   const csReviewNeeded = rows.filter((r) => r.csScore != null && r.csScore < 90).length
   const groupReviewNeeded = rows.filter((r) => r.groupScore != null && r.groupScore < 85).length
@@ -232,21 +243,6 @@ export default function App() {
     { id: 'agents', label: 'All Agents', icon: Table2 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ]
-
-  const todaysPicks = useMemo(() => {
-    const list = qaPicks.filter((p) => p.meeting.dayName === currentDayName)
-
-    if (list.length > 0) return list
-    if (!nextMeeting) return []
-
-    const upcoming = qaPicks.find(
-      (p) =>
-        p.meeting.center === nextMeeting.center &&
-        p.meeting.label === nextMeeting.label
-    )
-
-    return upcoming ? [upcoming] : []
-  }, [qaPicks, currentDayName, nextMeeting])
 
   return (
     <div
@@ -352,6 +348,14 @@ export default function App() {
               </div>
             )}
 
+            {activeTab === 'daily' && (
+              <TodaySpotlight
+                picks={todaysPicks}
+                now={now}
+                nextMeeting={nextMeeting}
+              />
+            )}
+
             {activeTab === 'overview' && (
               <>
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -397,14 +401,6 @@ export default function App() {
                   ))}
                 </div>
               </>
-            )}
-
-            {activeTab === 'daily' && (
-              <TodaySpotlight
-                picks={todaysPicks}
-                now={now}
-                nextMeeting={nextMeeting}
-              />
             )}
 
             {activeTab === 'agents' && (
