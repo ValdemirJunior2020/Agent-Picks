@@ -1,5 +1,5 @@
 // client/src/components/AgentCard.jsx
-import { AlertTriangle, CheckCircle2, Info } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Info, CalendarClock } from 'lucide-react'
 
 function cleanTitle(title = '') {
   return String(title)
@@ -31,18 +31,24 @@ export default function AgentCard({ title, agent, tone = 'neutral', note }) {
         'border-rose-300 bg-rose-50/80 text-rose-950 dark:border-rose-800 dark:bg-rose-950/35 dark:text-rose-100',
       icon: 'text-rose-700 dark:text-rose-300',
       badge: 'bg-white/80 text-rose-900 dark:bg-rose-950 dark:text-rose-100',
+      dateBox:
+        'border-rose-200 bg-white/70 text-rose-950 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-100',
     },
     green: {
       wrapper:
         'border-emerald-300 bg-emerald-50/80 text-emerald-950 dark:border-emerald-800 dark:bg-emerald-950/35 dark:text-emerald-100',
       icon: 'text-emerald-700 dark:text-emerald-300',
       badge: 'bg-white/80 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100',
+      dateBox:
+        'border-emerald-200 bg-white/70 text-emerald-950 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100',
     },
     neutral: {
       wrapper:
         'border-amber-300 bg-white/80 text-stone-800 dark:border-stone-700 dark:bg-stone-900/60 dark:text-stone-100',
       icon: 'text-stone-600 dark:text-stone-300',
       badge: 'bg-white/80 text-stone-800 dark:bg-stone-800 dark:text-stone-100',
+      dateBox:
+        'border-amber-200 bg-white/70 text-stone-800 dark:border-stone-700 dark:bg-stone-900/40 dark:text-stone-100',
     },
   }
 
@@ -98,6 +104,37 @@ export default function AgentCard({ title, agent, tone = 'neutral', note }) {
         <p>
           <strong>Supervisor:</strong> {agent.supervisor || 'N/A'}
         </p>
+      </div>
+
+      <div className={`mt-4 rounded-xl border p-3 text-sm ${selected.dateBox}`}>
+        <div className="flex items-center gap-2 font-black">
+          <CalendarClock className="h-4 w-4" />
+          Review Rotation
+        </div>
+
+        <div className="mt-2 grid gap-1">
+          <p>
+            <strong>Last Reviewed:</strong>{' '}
+            {agent.lastReviewLabel || 'No review date found'}
+          </p>
+
+          <p>
+            <strong>Eligible Again:</strong>{' '}
+            {agent.eligibleAgainLabel || 'Available now'}
+          </p>
+
+          {agent.daysSinceLastReview != null && (
+            <p>
+              <strong>Days Since Review:</strong> {agent.daysSinceLastReview}
+            </p>
+          )}
+
+          {agent.isRecentlyReviewed && (
+            <p className="mt-2 rounded-lg bg-amber-100 px-3 py-2 font-bold text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+              Skipped from picks because this agent was reviewed within the last 90 days.
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="mt-4 rounded-xl bg-white/55 p-3 text-sm dark:bg-stone-950/35">

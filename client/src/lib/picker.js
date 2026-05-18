@@ -10,12 +10,122 @@ const CENTER_ALIASES = [
   { center: 'ICC', patterns: ['ICC'] },
 ]
 
+const REVIEW_LOCK_DAYS = 90
+
 function normalize(value) {
   return String(value ?? '').trim()
 }
 
 function upper(value) {
   return normalize(value).toUpperCase()
+}
+
+function formatDate(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return ''
+
+  return date.toLocaleDateString('en-US', {
+    month: 'numeric',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+function addDays(date, days) {
+  const copy = new Date(date)
+  copy.setDate(copy.getDate() + days)
+  return copy
+}
+
+function daysBetween(dateA, dateB) {
+  const start = new Date(dateA.getFullYear(), dateA.getMonth(), dateA.getDate())
+  const end = new Date(dateB.getFullYear(), dateB.getMonth(), dateB.getDate())
+  return Math.floor((end.getTime() - start.getTime()) / 86400000)
+}
+
+function inferReviewYear(month, day, now = new Date()) {
+  let year = now.getFullYear()
+  let date = new Date(year, month - 1, day)
+
+  const futureBuffer = addDays(now, 7)
+
+  if (date > futureBuffer) {
+    year -= 1
+    date = new Date(year, month - 1, day)
+  }
+
+  return date
+}
+
+function parseReviewDatesFromText(text) {
+  const source = normalize(text)
+  const dates = []
+
+  if (!source) return dates
+
+  const patterns = [
+    /(?:^|\s|\|)(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\s*(?=>|G|CS|\/|$|\s)/gi,
+  ]
+
+  patterns.forEach((pattern) => {
+    let match
+
+    while ((match = pattern.exec(source)) !== null) {
+      const month = Number(match[1])
+      const day = Number(match[2])
+      const yearText = match[3]
+
+      if (!month || !day || month < 1 || month > 12 || day < 1 || day > 31) {
+        continue
+      }
+
+      let date
+
+      if (yearText) {
+        const year = Number(yearText.length === 2 ? `20${yearText}` : yearText)
+        date = new Date(year, month - 1, day)
+      } else {
+        date = inferReviewYear(month, day)
+      }
+
+      if (!Number.isNaN(date.getTime())) {
+        dates.push(date)
+      }
+    }
+  })
+
+  return dates
+}
+
+function getMostRecentReviewDate(text) {
+  const dates = parseReviewDatesFromText(text)
+
+  if (!dates.length) return null
+
+  return dates.sort((a, b) => b.getTime() - a.getTime())[0]
+}
+
+function getReviewEligibility(lastReviewDate, now = new Date()) {
+  if (!lastReviewDate) {
+    return {
+      isRecentlyReviewed: false,
+      daysSinceLastReview: null,
+      eligibleAgainDate: null,
+      eligibleAgainLabel: '',
+      lastReviewLabel: '',
+    }
+  }
+
+  const daysSinceLastReview = daysBetween(lastReviewDate, now)
+  const eligibleAgainDate = addDays(lastReviewDate, REVIEW_LOCK_DAYS)
+  const isRecentlyReviewed = daysSinceLastReview >= 0 && daysSinceLastReview < REVIEW_LOCK_DAYS
+
+  return {
+    isRecentlyReviewed,
+    daysSinceLastReview,
+    eligibleAgainDate,
+    eligibleAgainLabel: formatDate(eligibleAgainDate),
+    lastReviewLabel: formatDate(lastReviewDate),
+  }
 }
 
 export function inferCenter(sheetName = '', row = {}) {
@@ -40,7 +150,7 @@ export function parseDateWeek(value) {
     parsedDate = new Date(year, Number(m) - 1, Number(d))
   }
 
-  const weekMatch = text.match(/W\s*(\d+)/i)
+  const weekMatch = text.match(/W\s*\.?\s*(\d+)/i)
 
   return {
     raw: text,
@@ -65,18 +175,19 @@ export function parseScoresFromText(...parts) {
   ]
 
   const groupPatterns = [
-    /(?:^|\s)(?:G|GRP|GROUP)\s*[/:>-]*\s*(\d{1,3})\s*%?/i,
+    /(?:^|\s|>)(?:G|GRP|GROUP)\s*[/:>-]*\s*(\d{1,3})\s*%?/i,
     /(\d{1,3})\s*%?\s*(?:G|GRP|GROUP)(?:\s|$)/i,
   ]
 
   const hasGroupCalls =
-    /(?:^|\s)(G|GRP|GROUP)\s*[/:>-]*/i.test(text) ||
+    /(?:^|\s|>)(G|GRP|GROUP)\s*[/:>-]*/i.test(text) ||
     /\d{1,3}\s*%?\s*(G|GRP|GROUP)(?:\s|$)/i.test(text)
 
   score.hasGroupCalls = hasGroupCalls
 
   for (const pattern of csPatterns) {
     const found = text.match(pattern)
+
     if (found) {
       score.cs = Number(found[1])
       break
@@ -85,6 +196,7 @@ export function parseScoresFromText(...parts) {
 
   for (const pattern of groupPatterns) {
     const found = text.match(pattern)
+
     if (found) {
       score.group = Number(found[1])
       score.hasGroupCalls = true
@@ -93,6 +205,15 @@ export function parseScoresFromText(...parts) {
   }
 
   return score
+}
+
+function cleanDisplayNotes(text = '') {
+  return String(text)
+    .split('|')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => !/^(true|false)$/i.test(part))
+    .join(' | ')
 }
 
 export function normalizeRows(payload) {
@@ -129,12 +250,15 @@ export function normalizeRows(payload) {
           values[2]
       )
 
-      const notes = normalize(
-        row.notes ||
+      const reviewText = normalize(
+        row.reviewText ||
+          row.notes ||
           row.Notes ||
           row.Comments ||
-          values.slice(4).join(' | ')
+          values.slice(3).join(' | ')
       )
+
+      const notes = cleanDisplayNotes(reviewText)
 
       const reviewFlags = normalize(
         row.reviewFlags ||
@@ -153,15 +277,18 @@ export function normalizeRows(payload) {
       const dateWeek = parseDateWeek(start)
       const center = inferCenter(sheetName, row)
 
+      const lastReviewDate = getMostRecentReviewDate(reviewText)
+      const reviewEligibility = getReviewEligibility(lastReviewDate)
+
       const riskWords =
-        /(needs work|question|schedule|ts|terrible|low|markdown|bad|fail|coaching|refund|not follow|escalat)/i.test(
+        /(needs work|question|schedule|ts|terrible|low|markdown|fail|coaching|refund|not follow|escalat|not helpful|to be removed)/i.test(
           fullText
         )
 
       const isActive = !/(inactive|terminated|resigned|left company)/i.test(fullText)
 
       return {
-        id: `${sheetName}-${row.rowNumber || index + 1}`,
+        id: `${sheetName}-${row.rowNumber || index + 1}-${agentName}`,
         sourceSheet: sheetName,
         rowNumber: row.rowNumber || index + 1,
         center,
@@ -172,18 +299,26 @@ export function normalizeRows(payload) {
         groupScore: scores.group,
         hasGroupCalls: scores.hasGroupCalls,
         notes,
+        reviewText,
         reviewFlags,
         fullText,
         values,
         dateWeek,
         isActive,
         riskWords,
+
+        lastReviewDate,
+        lastReviewLabel: reviewEligibility.lastReviewLabel,
+        daysSinceLastReview: reviewEligibility.daysSinceLastReview,
+        isRecentlyReviewed: reviewEligibility.isRecentlyReviewed,
+        eligibleAgainDate: reviewEligibility.eligibleAgainDate,
+        eligibleAgainLabel: reviewEligibility.eligibleAgainLabel,
       }
     })
     .filter((row) => row.agentName && !/^agent\s*name$/i.test(row.agentName))
 }
 
-function riskScore(agent, type = 'cs') {
+function reviewScore(agent, type = 'cs') {
   const value = type === 'group' ? agent.groupScore : agent.csScore
   const threshold = type === 'group' ? 85 : 90
 
@@ -191,18 +326,20 @@ function riskScore(agent, type = 'cs') {
 
   if (agent.riskWords) score += 35
   if (agent.hasGroupCalls && type === 'group') score += 20
+  if (agent.reviewFlags) score += 8
 
-  if (agent.dateWeek.date) {
-    const ageDays = Math.max(0, (Date.now() - agent.dateWeek.date.getTime()) / 86400000)
-    score += Math.max(0, 45 - Math.min(45, ageDays / 2))
+  if (agent.lastReviewDate && !agent.isRecentlyReviewed) {
+    score += Math.min(25, Math.max(0, (agent.daysSinceLastReview || 0) - REVIEW_LOCK_DAYS) / 5)
   }
 
-  if (agent.reviewFlags) score += 8
+  if (agent.isRecentlyReviewed) {
+    score -= 9999
+  }
 
   return score
 }
 
-function goodCsScore(agent) {
+function strongCsScore(agent) {
   const cs = agent.csScore ?? -1
   let score = cs
 
@@ -210,11 +347,12 @@ function goodCsScore(agent) {
   if (agent.groupScore != null && agent.groupScore >= 85) score += 10
   if (agent.riskWords) score -= 30
   if (agent.reviewFlags) score += 5
+  if (agent.isRecentlyReviewed) score -= 9999
 
   return score
 }
 
-function goodGroupScore(agent) {
+function strongGroupScore(agent) {
   const group = agent.groupScore ?? -1
   let score = group
 
@@ -223,6 +361,7 @@ function goodGroupScore(agent) {
   if (agent.csScore != null && agent.csScore >= 90) score += 10
   if (agent.riskWords) score -= 30
   if (agent.reviewFlags) score += 5
+  if (agent.isRecentlyReviewed) score -= 9999
 
   return score
 }
@@ -243,50 +382,55 @@ function uniqueAgents(list) {
 function pickOne(candidates, usedIds, type, allowUsedIfNeeded = false) {
   if (!candidates.length) return null
 
-  const availablePool = candidates.filter((a) => !usedIds.has(a.id))
+  const eligible = candidates.filter((agent) => !agent.isRecentlyReviewed)
+  const availablePool = eligible.filter((a) => !usedIds.has(a.id))
 
   if (availablePool.length) {
-    const sorted = availablePool.sort((a, b) => riskScore(b, type) - riskScore(a, type))
+    const sorted = availablePool.sort((a, b) => reviewScore(b, type) - reviewScore(a, type))
     usedIds.add(sorted[0].id)
     return sorted[0]
   }
 
-  if (allowUsedIfNeeded) {
-    const sorted = candidates.sort((a, b) => riskScore(b, type) - riskScore(a, type))
+  if (allowUsedIfNeeded && eligible.length) {
+    const sorted = eligible.sort((a, b) => reviewScore(b, type) - reviewScore(a, type))
     return sorted[0] || null
   }
 
   return null
 }
 
-function pickBestGoodCs(candidates, usedIds) {
-  if (!candidates.length) return null
+function pickBestStrongCs(candidates, usedIds) {
+  const eligible = candidates.filter((agent) => !agent.isRecentlyReviewed)
 
-  const available = candidates.filter((agent) => !usedIds.has(agent.id))
+  if (!eligible.length) return null
+
+  const available = eligible.filter((agent) => !usedIds.has(agent.id))
 
   if (available.length) {
-    const sorted = available.sort((a, b) => goodCsScore(b) - goodCsScore(a))
+    const sorted = available.sort((a, b) => strongCsScore(b) - strongCsScore(a))
     usedIds.add(sorted[0].id)
     return sorted[0]
   }
 
-  const sorted = candidates.sort((a, b) => goodCsScore(b) - goodCsScore(a))
+  const sorted = eligible.sort((a, b) => strongCsScore(b) - strongCsScore(a))
   return sorted[0] || null
 }
 
-function pickBestGoodGroup(candidates, usedIds, allowSameAgent = true) {
-  if (!candidates.length) return null
+function pickBestStrongGroup(candidates, usedIds, allowSameAgent = true) {
+  const eligible = candidates.filter((agent) => !agent.isRecentlyReviewed)
 
-  const available = candidates.filter((agent) => !usedIds.has(agent.id))
+  if (!eligible.length) return null
+
+  const available = eligible.filter((agent) => !usedIds.has(agent.id))
 
   if (available.length) {
-    const sorted = available.sort((a, b) => goodGroupScore(b) - goodGroupScore(a))
+    const sorted = available.sort((a, b) => strongGroupScore(b) - strongGroupScore(a))
     usedIds.add(sorted[0].id)
     return sorted[0]
   }
 
   if (allowSameAgent) {
-    const sorted = candidates.sort((a, b) => goodGroupScore(b) - goodGroupScore(a))
+    const sorted = eligible.sort((a, b) => strongGroupScore(b) - strongGroupScore(a))
     return sorted[0] || null
   }
 
@@ -300,9 +444,10 @@ export function generatePicks(allRows) {
     if (meeting.summaryOnly) {
       const risky = rows.filter(
         (a) =>
-          (a.csScore != null && a.csScore < 90) ||
-          (a.groupScore != null && a.groupScore < 85) ||
-          a.riskWords
+          !a.isRecentlyReviewed &&
+          ((a.csScore != null && a.csScore < 90) ||
+            (a.groupScore != null && a.groupScore < 85) ||
+            a.riskWords)
       )
 
       return {
@@ -319,35 +464,38 @@ export function generatePicks(allRows) {
         (meeting.center === 'BUWELO' && /BU|COLOMBIA|GHANA/i.test(row.sourceSheet))
     )
 
+    const eligibleCenterRows = centerRows.filter((agent) => !agent.isRecentlyReviewed)
+    const skippedRecentlyReviewed = centerRows.filter((agent) => agent.isRecentlyReviewed)
+
     const used = new Set()
 
-    const badCsCandidates = centerRows.filter((a) =>
+    const csReviewCandidates = eligibleCenterRows.filter((a) =>
       a.csScore != null ? a.csScore < 90 : a.riskWords
     )
 
-    const groupAgents = centerRows.filter((a) => a.hasGroupCalls || a.groupScore != null)
+    const groupAgents = eligibleCenterRows.filter((a) => a.hasGroupCalls || a.groupScore != null)
 
-    const badGroupCandidates = groupAgents.filter((a) =>
+    const groupReviewCandidates = groupAgents.filter((a) =>
       a.groupScore != null ? a.groupScore < 85 : a.riskWords
     )
 
-    const goodCsCandidates = centerRows.filter(
+    const strongCsCandidates = eligibleCenterRows.filter(
       (a) => a.csScore != null && a.csScore >= 90 && !a.riskWords
     )
 
-    const goodGroupCandidates = groupAgents.filter(
+    const strongGroupCandidates = groupAgents.filter(
       (a) => a.groupScore != null && a.groupScore >= 85 && !a.riskWords
     )
 
-    const fallbackWorst = centerRows
+    const fallbackWorst = eligibleCenterRows
       .filter((a) => !used.has(a.id))
-      .sort((a, b) => riskScore(b, 'cs') - riskScore(a, 'cs'))
+      .sort((a, b) => reviewScore(b, 'cs') - reviewScore(a, 'cs'))
 
     const fallbackGroupWorst = groupAgents
-      .sort((a, b) => riskScore(b, 'group') - riskScore(a, 'group'))
+      .sort((a, b) => reviewScore(b, 'group') - reviewScore(a, 'group'))
 
     const badCs = pickOne(
-      badCsCandidates.length ? badCsCandidates : fallbackWorst,
+      csReviewCandidates.length ? csReviewCandidates : fallbackWorst,
       used,
       'cs',
       false
@@ -356,7 +504,7 @@ export function generatePicks(allRows) {
     const badGroup = meeting.csOnly
       ? null
       : pickOne(
-          badGroupCandidates.length ? badGroupCandidates : fallbackGroupWorst,
+          groupReviewCandidates.length ? groupReviewCandidates : fallbackGroupWorst,
           used,
           'group',
           true
@@ -364,15 +512,15 @@ export function generatePicks(allRows) {
 
     const goodUsed = new Set(used)
 
-    const bestGoodCs = pickBestGoodCs(
-      goodCsCandidates.length ? goodCsCandidates : centerRows,
+    const bestGoodCs = pickBestStrongCs(
+      strongCsCandidates.length ? strongCsCandidates : eligibleCenterRows,
       goodUsed
     )
 
     const bestGoodGroup = meeting.csOnly
       ? null
-      : pickBestGoodGroup(
-          goodGroupCandidates.length ? goodGroupCandidates : groupAgents,
+      : pickBestStrongGroup(
+          strongGroupCandidates.length ? strongGroupCandidates : groupAgents,
           goodUsed,
           true
         )
@@ -384,28 +532,32 @@ export function generatePicks(allRows) {
     return {
       meeting,
       centerRowsCount: centerRows.length,
+      eligibleRowsCount: eligibleCenterRows.length,
+      skippedRecentlyReviewedCount: skippedRecentlyReviewed.length,
       badCs,
       badGroup,
       bestGoodCs,
       bestGoodGroup,
       goodAgents,
       notes: [
-        !badCsCandidates.length && 'No clear CS < 90 found; showing worst available.',
+        skippedRecentlyReviewed.length > 0 &&
+          `${skippedRecentlyReviewed.length} agent(s) skipped because they were reviewed in the last ${REVIEW_LOCK_DAYS} days.`,
+        !csReviewCandidates.length && 'No clear CS review below 90 found among eligible agents; showing worst eligible option.',
         meeting.csOnly && 'TELUS is CS only. Group pick skipped.',
         !meeting.csOnly &&
-          !badGroupCandidates.length &&
-          'No clear Group < 85 found; showing worst available group-call agent.',
+          !groupReviewCandidates.length &&
+          'No clear Group review below 85 found among eligible group-call agents; showing worst eligible option.',
         badCs &&
           badGroup &&
           badCs.id === badGroup.id &&
-          'Same agent selected for bad CS and bad Group because this row contains both CS and G scores.',
+          'Same record selected for CS and Group review because this row contains both CS and G scores.',
         bestGoodCs &&
           bestGoodGroup &&
           bestGoodCs.id === bestGoodGroup.id &&
-          'Same agent selected for best CS and best Group because this row contains both strong CS and G scores.',
+          'Same record selected for strong CS and strong Group example because this row contains both strong CS and G scores.',
         !meeting.csOnly &&
           !bestGoodGroup &&
-          'No clear good Group agent found.',
+          'No clear strong Group example found among eligible agents.',
       ].filter(Boolean),
     }
   })
@@ -439,7 +591,7 @@ export function filterRows(rows, filters) {
     if (!search) return true
 
     return upper(
-      `${row.agentName} ${row.supervisor} ${row.center} ${row.notes} ${row.fullText}`
+      `${row.agentName} ${row.supervisor} ${row.center} ${row.notes} ${row.fullText} ${row.lastReviewLabel}`
     ).includes(search)
   })
 }
