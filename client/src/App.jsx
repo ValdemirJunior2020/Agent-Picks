@@ -23,6 +23,7 @@ import DayCard from './components/DayCard'
 import AgentTable from './components/AgentTable'
 import TodaySpotlight from './components/TodaySpotlight'
 import NextPickWarning from './components/NextPickWarning'
+import SmileOfTheDay from './components/SmileOfTheDay'
 
 const QA_DAYS = ['Tuesday', 'Wednesday', 'Thursday', 'Friday']
 
@@ -314,6 +315,8 @@ export default function App() {
           </aside>
 
           <section className="space-y-5">
+            <SmileOfTheDay />
+
             <NextPickWarning nextPickGroup={nextPickGroup} />
 
             <div className="rounded-[1.5rem] border border-emerald-300 bg-emerald-50/90 p-4 text-sm font-semibold text-emerald-950 shadow-sm backdrop-blur dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
