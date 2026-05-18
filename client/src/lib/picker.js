@@ -11,6 +11,7 @@ const CENTER_ALIASES = [
 ]
 
 const REVIEW_LOCK_DAYS = 90
+const NESTING_DAYS = 45
 
 function normalize(value) {
   return String(value ?? '').trim()
@@ -56,6 +57,23 @@ function inferReviewYear(month, day, now = new Date()) {
   return date
 }
 
+function parseStartDate(startDateText) {
+  const text = normalize(startDateText)
+  const match = text.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/)
+
+  if (!match) return null
+
+  const month = Number(match[1])
+  const day = Number(match[2])
+  const yearText = match[3]
+  const year = Number(yearText.length === 2 ? `20${yearText}` : yearText)
+  const date = new Date(year, month - 1, day)
+
+  if (Number.isNaN(date.getTime())) return null
+
+  return date
+}
+
 function parseReviewDatesFromText(text) {
   const source = normalize(text)
   const dates = []
@@ -69,7 +87,7 @@ function parseReviewDatesFromText(text) {
     // G>5/16>100
     /(?:G|GRP|GROUP|CS)\s*>\s*(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\s*(?=>|\s|$)/gi,
 
-    // Review 5/16 100
+    // Review 5/16 or QA: 5/16
     /(?:review|rev|qa)\s*[:#-]?\s*(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?/gi,
   ]
 
@@ -111,27 +129,128 @@ function getMostRecentReviewDate(text) {
   return dates.sort((a, b) => b.getTime() - a.getTime())[0]
 }
 
-function getReviewEligibility(lastReviewDate, now = new Date()) {
-  if (!lastReviewDate) {
+function getReviewRotationStatus({
+  startDateText,
+  reviewText,
+  isReviewedChecked,
+  now = new Date(),
+}) {
+  const startDate = parseStartDate(startDateText)
+  const lastReviewDate = getMostRecentReviewDate(reviewText)
+
+  const daysSinceStart = startDate ? daysBetween(startDate, now) : null
+  const isNesting =
+    daysSinceStart !== null &&
+    daysSinceStart >= 0 &&
+    daysSinceStart < NESTING_DAYS
+
+  const daysSinceLastReview = lastReviewDate ? daysBetween(lastReviewDate, now) : null
+  const eligibleAgainDate = lastReviewDate ? addDays(lastReviewDate, REVIEW_LOCK_DAYS) : null
+
+  const wasReviewedRecently =
+    !!lastReviewDate &&
+    daysSinceLastReview >= 0 &&
+    daysSinceLastReview < REVIEW_LOCK_DAYS
+
+  const hasReviewDateButCheckboxMissing = !!lastReviewDate && !isReviewedChecked
+  const hasCheckboxButNoReviewDate = isReviewedChecked && !lastReviewDate
+
+  if (isNesting) {
     return {
-      isRecentlyReviewed: false,
-      daysSinceLastReview: null,
-      eligibleAgainDate: null,
-      eligibleAgainLabel: '',
-      lastReviewLabel: '',
+      reviewRotationStatus: 'nesting',
+      shouldSkipReviewRotation: true,
+      reviewRotationLabel: 'Nesting / Training',
+      reviewRotationReason: 'Nesting / Training agent — separated from regular QA rotation.',
+      startDate,
+      daysSinceStart,
+      isNesting: true,
+      isReviewedChecked,
+      lastReviewDate,
+      lastReviewLabel: lastReviewDate ? formatDate(lastReviewDate) : 'No previous review found',
+      daysSinceLastReview,
+      eligibleAgainDate,
+      eligibleAgainLabel: 'Nesting / Training',
+      hasReviewDateButCheckboxMissing,
+      hasCheckboxButNoReviewDate,
     }
   }
 
-  const daysSinceLastReview = daysBetween(lastReviewDate, now)
-  const eligibleAgainDate = addDays(lastReviewDate, REVIEW_LOCK_DAYS)
-  const isRecentlyReviewed = daysSinceLastReview >= 0 && daysSinceLastReview < REVIEW_LOCK_DAYS
+  if (wasReviewedRecently) {
+    return {
+      reviewRotationStatus: 'recently-reviewed',
+      shouldSkipReviewRotation: true,
+      reviewRotationLabel: 'Reviewed Recently',
+      reviewRotationReason: `Reviewed within the last ${REVIEW_LOCK_DAYS} days.`,
+      startDate,
+      daysSinceStart,
+      isNesting: false,
+      isReviewedChecked,
+      lastReviewDate,
+      lastReviewLabel: formatDate(lastReviewDate),
+      daysSinceLastReview,
+      eligibleAgainDate,
+      eligibleAgainLabel: formatDate(eligibleAgainDate),
+      hasReviewDateButCheckboxMissing,
+      hasCheckboxButNoReviewDate,
+    }
+  }
+
+  if (hasCheckboxButNoReviewDate) {
+    return {
+      reviewRotationStatus: 'checked-no-date',
+      shouldSkipReviewRotation: true,
+      reviewRotationLabel: 'Needs Sheet Cleanup',
+      reviewRotationReason: 'Review checkbox is checked, but no review date was found.',
+      startDate,
+      daysSinceStart,
+      isNesting: false,
+      isReviewedChecked,
+      lastReviewDate: null,
+      lastReviewLabel: 'Reviewed checked, but no date found',
+      daysSinceLastReview: null,
+      eligibleAgainDate: null,
+      eligibleAgainLabel: 'Needs sheet cleanup',
+      hasReviewDateButCheckboxMissing,
+      hasCheckboxButNoReviewDate,
+    }
+  }
+
+  if (lastReviewDate && daysSinceLastReview >= REVIEW_LOCK_DAYS) {
+    return {
+      reviewRotationStatus: 'eligible-reviewed-before',
+      shouldSkipReviewRotation: false,
+      reviewRotationLabel: 'Reviewed Before — Eligible Again',
+      reviewRotationReason: 'Reviewed before, but eligible again because last review is older than 90 days.',
+      startDate,
+      daysSinceStart,
+      isNesting: false,
+      isReviewedChecked,
+      lastReviewDate,
+      lastReviewLabel: formatDate(lastReviewDate),
+      daysSinceLastReview,
+      eligibleAgainDate,
+      eligibleAgainLabel: formatDate(eligibleAgainDate),
+      hasReviewDateButCheckboxMissing,
+      hasCheckboxButNoReviewDate,
+    }
+  }
 
   return {
-    isRecentlyReviewed,
-    daysSinceLastReview,
-    eligibleAgainDate,
-    eligibleAgainLabel: formatDate(eligibleAgainDate),
-    lastReviewLabel: formatDate(lastReviewDate),
+    reviewRotationStatus: 'never-reviewed',
+    shouldSkipReviewRotation: false,
+    reviewRotationLabel: 'Never Reviewed — Eligible',
+    reviewRotationReason: 'No previous review found — eligible for QA rotation.',
+    startDate,
+    daysSinceStart,
+    isNesting: false,
+    isReviewedChecked,
+    lastReviewDate: null,
+    lastReviewLabel: 'No previous review found',
+    daysSinceLastReview: null,
+    eligibleAgainDate: null,
+    eligibleAgainLabel: 'Available now',
+    hasReviewDateButCheckboxMissing,
+    hasCheckboxButNoReviewDate,
   }
 }
 
@@ -227,6 +346,42 @@ function cleanDisplayNotes(text = '') {
     .join(' | ')
 }
 
+function detectReviewedCheckbox(row, values) {
+  if (
+    row.isReviewedChecked === true ||
+    row.reviewedChecked === true ||
+    row.internalReviewChecked === true ||
+    row.reviewed === true
+  ) {
+    return true
+  }
+
+  if (
+    String(row.isReviewedChecked).toLowerCase() === 'true' ||
+    String(row.reviewedChecked).toLowerCase() === 'true' ||
+    String(row.internalReviewChecked).toLowerCase() === 'true' ||
+    String(row.reviewed).toLowerCase() === 'true'
+  ) {
+    return true
+  }
+
+  const checkboxValues = [
+    row.reviewFlags,
+    row.flags,
+    row.internalReviewRequired,
+    row.internalReview,
+    values?.[3],
+    values?.[7],
+    values?.[11],
+    values?.[14],
+    values?.[15],
+  ]
+    .map((value) => String(value ?? '').trim())
+    .join(' ')
+
+  return /true|checked|✓|☑/i.test(checkboxValues)
+}
+
 export function normalizeRows(payload) {
   const rows = Array.isArray(payload?.rows) ? payload.rows : []
 
@@ -288,9 +443,14 @@ export function normalizeRows(payload) {
       const dateWeek = parseDateWeek(start)
       const center = inferCenter(sheetName, row)
 
+      const isReviewedChecked = detectReviewedCheckbox(row, values)
       const dateSearchText = `${reviewText} ${fullText}`
-      const lastReviewDate = getMostRecentReviewDate(dateSearchText)
-      const reviewEligibility = getReviewEligibility(lastReviewDate)
+
+      const rotation = getReviewRotationStatus({
+        startDateText: start,
+        reviewText: dateSearchText,
+        isReviewedChecked,
+      })
 
       const riskWords =
         /(needs work|question|schedule|ts|terrible|low|markdown|fail|coaching|refund|not follow|escalat|not helpful|to be removed)/i.test(
@@ -319,12 +479,24 @@ export function normalizeRows(payload) {
         isActive,
         riskWords,
 
-        lastReviewDate,
-        lastReviewLabel: reviewEligibility.lastReviewLabel,
-        daysSinceLastReview: reviewEligibility.daysSinceLastReview,
-        isRecentlyReviewed: reviewEligibility.isRecentlyReviewed,
-        eligibleAgainDate: reviewEligibility.eligibleAgainDate,
-        eligibleAgainLabel: reviewEligibility.eligibleAgainLabel,
+        isReviewedChecked: rotation.isReviewedChecked,
+        isNesting: rotation.isNesting,
+        reviewRotationStatus: rotation.reviewRotationStatus,
+        reviewRotationLabel: rotation.reviewRotationLabel,
+        reviewRotationReason: rotation.reviewRotationReason,
+        shouldSkipReviewRotation: rotation.shouldSkipReviewRotation,
+
+        lastReviewDate: rotation.lastReviewDate,
+        lastReviewLabel: rotation.lastReviewLabel,
+        daysSinceLastReview: rotation.daysSinceLastReview,
+        eligibleAgainDate: rotation.eligibleAgainDate,
+        eligibleAgainLabel: rotation.eligibleAgainLabel,
+        daysSinceStart: rotation.daysSinceStart,
+
+        hasReviewDateButCheckboxMissing: rotation.hasReviewDateButCheckboxMissing,
+        hasCheckboxButNoReviewDate: rotation.hasCheckboxButNoReviewDate,
+
+        isRecentlyReviewed: rotation.reviewRotationStatus === 'recently-reviewed',
       }
     })
     .filter((row) => row.agentName && !/^agent\s*name$/i.test(row.agentName))
@@ -340,11 +512,11 @@ function reviewScore(agent, type = 'cs') {
   if (agent.hasGroupCalls && type === 'group') score += 20
   if (agent.reviewFlags) score += 8
 
-  if (agent.lastReviewDate && !agent.isRecentlyReviewed) {
+  if (agent.lastReviewDate && !agent.shouldSkipReviewRotation) {
     score += Math.min(25, Math.max(0, (agent.daysSinceLastReview || 0) - REVIEW_LOCK_DAYS) / 5)
   }
 
-  if (agent.isRecentlyReviewed) {
+  if (agent.shouldSkipReviewRotation) {
     score -= 9999
   }
 
@@ -359,7 +531,7 @@ function strongCsScore(agent) {
   if (agent.groupScore != null && agent.groupScore >= 85) score += 10
   if (agent.riskWords) score -= 30
   if (agent.reviewFlags) score += 5
-  if (agent.isRecentlyReviewed) score -= 9999
+  if (agent.shouldSkipReviewRotation) score -= 9999
 
   return score
 }
@@ -373,7 +545,7 @@ function strongGroupScore(agent) {
   if (agent.csScore != null && agent.csScore >= 90) score += 10
   if (agent.riskWords) score -= 30
   if (agent.reviewFlags) score += 5
-  if (agent.isRecentlyReviewed) score -= 9999
+  if (agent.shouldSkipReviewRotation) score -= 9999
 
   return score
 }
@@ -394,7 +566,7 @@ function uniqueAgents(list) {
 function pickOne(candidates, usedIds, type, allowUsedIfNeeded = false) {
   if (!candidates.length) return null
 
-  const eligible = candidates.filter((agent) => !agent.isRecentlyReviewed)
+  const eligible = candidates.filter((agent) => !agent.shouldSkipReviewRotation)
   const availablePool = eligible.filter((a) => !usedIds.has(a.id))
 
   if (availablePool.length) {
@@ -412,7 +584,7 @@ function pickOne(candidates, usedIds, type, allowUsedIfNeeded = false) {
 }
 
 function pickBestStrongCs(candidates, usedIds) {
-  const eligible = candidates.filter((agent) => !agent.isRecentlyReviewed)
+  const eligible = candidates.filter((agent) => !agent.shouldSkipReviewRotation)
 
   if (!eligible.length) return null
 
@@ -429,7 +601,7 @@ function pickBestStrongCs(candidates, usedIds) {
 }
 
 function pickBestStrongGroup(candidates, usedIds, allowSameAgent = true) {
-  const eligible = candidates.filter((agent) => !agent.isRecentlyReviewed)
+  const eligible = candidates.filter((agent) => !agent.shouldSkipReviewRotation)
 
   if (!eligible.length) return null
 
@@ -456,7 +628,7 @@ export function generatePicks(allRows) {
     if (meeting.summaryOnly) {
       const risky = rows.filter(
         (a) =>
-          !a.isRecentlyReviewed &&
+          !a.shouldSkipReviewRotation &&
           ((a.csScore != null && a.csScore < 90) ||
             (a.groupScore != null && a.groupScore < 85) ||
             a.riskWords)
@@ -476,8 +648,10 @@ export function generatePicks(allRows) {
         (meeting.center === 'BUWELO' && /BU|COLOMBIA|GHANA/i.test(row.sourceSheet))
     )
 
-    const eligibleCenterRows = centerRows.filter((agent) => !agent.isRecentlyReviewed)
-    const skippedRecentlyReviewed = centerRows.filter((agent) => agent.isRecentlyReviewed)
+    const eligibleCenterRows = centerRows.filter((agent) => !agent.shouldSkipReviewRotation)
+    const skippedRotationRows = centerRows.filter((agent) => agent.shouldSkipReviewRotation)
+    const nestingRows = centerRows.filter((agent) => agent.isNesting)
+    const cleanupRows = centerRows.filter((agent) => agent.hasCheckboxButNoReviewDate)
 
     const used = new Set()
 
@@ -545,15 +719,22 @@ export function generatePicks(allRows) {
       meeting,
       centerRowsCount: centerRows.length,
       eligibleRowsCount: eligibleCenterRows.length,
-      skippedRecentlyReviewedCount: skippedRecentlyReviewed.length,
+      skippedRotationCount: skippedRotationRows.length,
+      skippedRecentlyReviewedCount: centerRows.filter((agent) => agent.reviewRotationStatus === 'recently-reviewed').length,
+      nestingCount: nestingRows.length,
+      cleanupNeededCount: cleanupRows.length,
       badCs,
       badGroup,
       bestGoodCs,
       bestGoodGroup,
       goodAgents,
       notes: [
-        skippedRecentlyReviewed.length > 0 &&
-          `${skippedRecentlyReviewed.length} agent(s) skipped because they were reviewed in the last ${REVIEW_LOCK_DAYS} days.`,
+        skippedRotationRows.length > 0 &&
+          `${skippedRotationRows.length} agent(s) skipped from regular picks because of review rotation rules.`,
+        nestingRows.length > 0 &&
+          `${nestingRows.length} nesting/training agent(s) separated from regular QA rotation.`,
+        cleanupRows.length > 0 &&
+          `${cleanupRows.length} agent(s) have review checkbox checked but no review date found; sheet cleanup needed.`,
         !csReviewCandidates.length && 'No clear CS review below 90 found among eligible agents; showing worst eligible option.',
         meeting.csOnly && 'TELUS is CS only. Group pick skipped.',
         !meeting.csOnly &&
@@ -603,7 +784,7 @@ export function filterRows(rows, filters) {
     if (!search) return true
 
     return upper(
-      `${row.agentName} ${row.supervisor} ${row.center} ${row.notes} ${row.fullText} ${row.lastReviewLabel}`
+      `${row.agentName} ${row.supervisor} ${row.center} ${row.notes} ${row.fullText} ${row.lastReviewLabel} ${row.reviewRotationLabel}`
     ).includes(search)
   })
 }

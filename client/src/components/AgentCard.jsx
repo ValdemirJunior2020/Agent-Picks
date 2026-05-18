@@ -24,6 +24,28 @@ function cleanTitle(title = '') {
     .replaceAll('BAD', 'REVIEW')
 }
 
+function getRotationBadgeClass(agent) {
+  if (!agent) return 'bg-stone-100 text-stone-800'
+
+  if (agent.reviewRotationStatus === 'nesting') {
+    return 'bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-100'
+  }
+
+  if (agent.reviewRotationStatus === 'recently-reviewed') {
+    return 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100'
+  }
+
+  if (agent.reviewRotationStatus === 'checked-no-date') {
+    return 'bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-100'
+  }
+
+  if (agent.reviewRotationStatus === 'eligible-reviewed-before') {
+    return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100'
+  }
+
+  return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100'
+}
+
 export default function AgentCard({ title, agent, tone = 'neutral', note }) {
   const styles = {
     red: {
@@ -112,10 +134,19 @@ export default function AgentCard({ title, agent, tone = 'neutral', note }) {
           Review Rotation
         </div>
 
-        <div className="mt-2 grid gap-1">
+        <div className="mt-2 grid gap-2">
+          <span className={`w-fit rounded-full px-3 py-1 text-xs font-black ${getRotationBadgeClass(agent)}`}>
+            {agent.reviewRotationLabel || 'Never Reviewed — Eligible'}
+          </span>
+
+          <p>
+            <strong>Reviewed Checkbox:</strong>{' '}
+            {agent.isReviewedChecked ? 'Checked' : 'Not checked'}
+          </p>
+
           <p>
             <strong>Last Reviewed:</strong>{' '}
-            {agent.lastReviewLabel || 'No review date found'}
+            {agent.lastReviewLabel || 'No previous review found'}
           </p>
 
           <p>
@@ -129,11 +160,15 @@ export default function AgentCard({ title, agent, tone = 'neutral', note }) {
             </p>
           )}
 
-          {agent.isRecentlyReviewed && (
-            <p className="mt-2 rounded-lg bg-amber-100 px-3 py-2 font-bold text-amber-900 dark:bg-amber-950 dark:text-amber-100">
-              Skipped from picks because this agent was reviewed within the last 90 days.
+          {agent.daysSinceStart != null && (
+            <p>
+              <strong>Days Since Start:</strong> {agent.daysSinceStart}
             </p>
           )}
+
+          <p className="rounded-lg bg-white/65 px-3 py-2 text-xs font-semibold dark:bg-stone-950/35">
+            {agent.reviewRotationReason || 'No previous review found — eligible for QA rotation.'}
+          </p>
         </div>
       </div>
 
