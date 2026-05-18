@@ -63,7 +63,14 @@ function parseReviewDatesFromText(text) {
   if (!source) return dates
 
   const patterns = [
-    /(?:^|\s|\|)(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\s*(?=>|G|CS|\/|$|\s)/gi,
+    // 12/30>G/50 CS/16
+    /(?:^|[^0-9])(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\s*(?=>|\s|$)/gi,
+
+    // G>5/16>100
+    /(?:G|GRP|GROUP|CS)\s*>\s*(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\s*(?=>|\s|$)/gi,
+
+    // Review 5/16 100
+    /(?:review|rev|qa)\s*[:#-]?\s*(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?/gi,
   ]
 
   patterns.forEach((pattern) => {
@@ -135,7 +142,11 @@ export function inferCenter(sheetName = '', row = {}) {
     item.patterns.some((pattern) => source.includes(pattern))
   )
 
-  return match?.center || upper(sheetName).replace(' QA', '').replace('CALL CENTER', '').trim() || 'UNKNOWN'
+  return (
+    match?.center ||
+    upper(sheetName).replace(' QA', '').replace('CALL CENTER', '').trim() ||
+    'UNKNOWN'
+  )
 }
 
 export function parseDateWeek(value) {
@@ -277,7 +288,8 @@ export function normalizeRows(payload) {
       const dateWeek = parseDateWeek(start)
       const center = inferCenter(sheetName, row)
 
-      const lastReviewDate = getMostRecentReviewDate(reviewText)
+      const dateSearchText = `${reviewText} ${fullText}`
+      const lastReviewDate = getMostRecentReviewDate(dateSearchText)
       const reviewEligibility = getReviewEligibility(lastReviewDate)
 
       const riskWords =
