@@ -35,34 +35,14 @@ const demoPayload = {
       values: ['Rhea May Primavera', 'W20 2/17/2025', 'Ginette Salvio', true, 'CS/35 needs work'],
     },
     {
-      sheetName: 'TEP QA',
-      rowNumber: 58,
-      values: ['Edmar Japson', 'W27 1/19/2026', 'Nicole C Demafelix', true, 'G/95 CS/98 great call'],
-    },
-    {
       sheetName: 'TELUS',
       rowNumber: 12,
       values: ['Maria Santos', 'W24 6/1/2026', 'Barbara Kalchik', true, 'CS/82 TS needs coaching'],
     },
     {
-      sheetName: 'TELUS',
-      rowNumber: 13,
-      values: ['Joao Lima', 'W24 6/1/2026', 'Barbara Kalchik', true, 'CS/99 strong notes'],
-    },
-    {
-      sheetName: 'BU W QA',
+      sheetName: 'BUW QA',
       rowNumber: 65,
       values: ['Merliz Signey De Paz', 'W18 11/24/2024', 'Nicole C Demafelix', true, 'G/50 CS/50'],
-    },
-    {
-      sheetName: 'BU W QA',
-      rowNumber: 67,
-      values: ['Richard Martin Competente', 'W20 2/17/2025', 'Nicole C Demafelix', true, 'G/50 CS/85'],
-    },
-    {
-      sheetName: 'BU W QA',
-      rowNumber: 71,
-      values: ['Zeidreck Leariel Turalde', 'W26 9/28/2025', 'Nicole C Demafelix', true, 'G/98 CS/100 amazing'],
     },
     {
       sheetName: 'WNS QA',
@@ -70,24 +50,9 @@ const demoPayload = {
       values: ['Ana Cruz', 'W25 9/22/2025', 'WNS Sup', true, 'G/78 CS/92 Questioning on Schedule'],
     },
     {
-      sheetName: 'WNS QA',
-      rowNumber: 23,
-      values: ['Carla Hope', 'W25 9/22/2025', 'WNS Sup', true, 'G/96 CS/96'],
-    },
-    {
       sheetName: 'CON QA',
       rowNumber: 78,
       values: ['James Eduard Balandra', 'W17 11/10/2024', 'Norte, Christine Ann C', true, 'G/50 CS/16'],
-    },
-    {
-      sheetName: 'CON QA',
-      rowNumber: 79,
-      values: ['Jissa Basamot', 'W17 11/10/2024', 'Norte, Christine Ann C', true, 'G/100 CS/100'],
-    },
-    {
-      sheetName: 'CON QA',
-      rowNumber: 80,
-      values: ['Justin Arvee Vargas', 'W17 11/10/2024', 'Norte, Christine Ann C', true, 'G/85 CS/85 Questioning on Schedule sent EM 4/29'],
     },
   ],
 }
@@ -193,28 +158,48 @@ export default function App() {
   }, [qaPicks, currentDayName])
 
   const todaysPicks = useMemo(() => {
-    const list = qaPicks.filter((p) => p.meeting.dayName === currentDayName)
-
-    if (list.length > 0) return list
-    if (!nextMeeting) return []
-
-    const upcoming = qaPicks.find(
-      (p) =>
-        p.meeting.center === nextMeeting.center &&
-        p.meeting.label === nextMeeting.label
+    const todaysRealQaMeetings = qaPicks.filter(
+      (pick) => pick.meeting.dayName === currentDayName
     )
 
-    return upcoming ? [upcoming] : []
-  }, [qaPicks, currentDayName, nextMeeting])
+    if (todaysRealQaMeetings.length > 0) {
+      return todaysRealQaMeetings
+    }
 
-  const csReviewNeeded = rows.filter((r) => r.csScore != null && r.csScore < 90).length
-  const groupReviewNeeded = rows.filter((r) => r.groupScore != null && r.groupScore < 85).length
+    if (nextPickGroup?.meetings?.length) {
+      const nextGroupLabels = nextPickGroup.meetings.map((meeting) => meeting.label)
+
+      const nextGroupPicks = qaPicks.filter((pick) =>
+        nextGroupLabels.includes(pick.meeting.label)
+      )
+
+      if (nextGroupPicks.length > 0) {
+        return nextGroupPicks
+      }
+    }
+
+    if (!nextMeeting) return []
+
+    const fallback = qaPicks.find(
+      (pick) =>
+        pick.meeting.center === nextMeeting.center &&
+        pick.meeting.label === nextMeeting.label
+    )
+
+    return fallback ? [fallback] : []
+  }, [qaPicks, currentDayName, nextPickGroup, nextMeeting])
+
+  const csReviewNeeded = rows.filter((row) => row.csScore != null && row.csScore < 90).length
+
+  const groupReviewNeeded = rows.filter(
+    (row) => row.groupScore != null && row.groupScore < 85
+  ).length
 
   const strongExamples = rows.filter(
-    (r) =>
-      (r.csScore == null || r.csScore >= 90) &&
-      (r.groupScore == null || r.groupScore >= 85) &&
-      !r.riskWords
+    (row) =>
+      (row.csScore == null || row.csScore >= 90) &&
+      (row.groupScore == null || row.groupScore >= 85) &&
+      !row.riskWords
   ).length
 
   async function loadLive() {
