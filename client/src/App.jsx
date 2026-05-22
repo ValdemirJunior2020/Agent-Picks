@@ -10,6 +10,7 @@ import {
   Wheat,
   Cross,
   ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react'
 import { fetchAgentRows } from './lib/api'
 import {
@@ -24,6 +25,7 @@ import AgentTable from './components/AgentTable'
 import TodaySpotlight from './components/TodaySpotlight'
 import NextPickWarning from './components/NextPickWarning'
 import SmileOfTheDay from './components/SmileOfTheDay'
+import UnderProbation from './components/UnderProbation'
 
 const QA_DAYS = ['Tuesday', 'Wednesday', 'Thursday', 'Friday']
 
@@ -226,6 +228,7 @@ export default function App() {
   const tabs = [
     { id: 'overview', label: 'Week Overview', icon: CalendarDays },
     { id: 'daily', label: "Today's Picks", icon: Wheat },
+    { id: 'probation', label: 'Under Probation', icon: AlertTriangle },
     { id: 'agents', label: 'All Agents', icon: Table2 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ]
@@ -294,7 +297,9 @@ export default function App() {
                   onClick={() => setActiveTab(id)}
                   className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-bold transition ${
                     activeTab === id
-                      ? 'bg-amber-800 text-white shadow'
+                      ? id === 'probation'
+                        ? 'bg-rose-700 text-white shadow'
+                        : 'bg-amber-800 text-white shadow'
                       : 'hover:bg-amber-100 dark:hover:bg-stone-800'
                   }`}
                 >
@@ -343,6 +348,8 @@ export default function App() {
                 nextMeeting={nextMeeting}
               />
             )}
+
+            {activeTab === 'probation' && <UnderProbation />}
 
             {activeTab === 'overview' && (
               <>
