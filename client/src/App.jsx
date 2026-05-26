@@ -1,4 +1,5 @@
 // client/src/App.jsx
+import FloatingMusicPlayer from './components/FloatingMusicPlayer'
 import { useEffect, useMemo, useState } from 'react'
 import {
   CalendarDays,
@@ -241,6 +242,8 @@ export default function App() {
           'linear-gradient(90deg, rgba(255,251,235,.66), rgba(255,247,237,.42), rgba(236,253,245,.32)), url("/bg.png")',
       }}
     >
+      <FloatingMusicPlayer />
+
       <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,.18),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(159,18,57,.10),transparent_40%)] dark:bg-[linear-gradient(90deg,rgba(28,25,23,.88),rgba(41,37,36,.72))]">
         <header className="sticky top-0 z-40 border-b border-amber-200/80 bg-stone-50/74 backdrop-blur-xl dark:border-stone-700 dark:bg-stone-950/72">
           <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
