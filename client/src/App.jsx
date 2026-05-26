@@ -109,7 +109,7 @@ function getDayPriority(dayName, currentDayName) {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('daily')
+  const [activeTab, setActiveTab] = useState('overview')
   const [dark, setDark] = useState(false)
   const [payload, setPayload] = useState(demoPayload)
   const [loading, setLoading] = useState(false)
@@ -226,7 +226,7 @@ export default function App() {
   }, [])
 
   const tabs = [
-    { id: 'overview', label: 'Week Overview', icon: CalendarDays },
+    { id: 'overview', label: 'Whole Week Picks', icon: CalendarDays },
     { id: 'daily', label: "Today's Picks", icon: Wheat },
     { id: 'probation', label: 'Under Probation', icon: AlertTriangle },
     { id: 'agents', label: 'All Agents', icon: Table2 },
