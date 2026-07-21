@@ -32,38 +32,80 @@ import SpecialCorrection from './components/SpecialCorrection'
 const QA_DAYS = ['Tuesday', 'Wednesday', 'Thursday', 'Friday']
 const emptyPayload = { success: true, reviews: [] }
 
-function Stat({ icon: Icon, label, value, sub, danger = false }) {
+function Stat({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  names = [],
+  alert = false,
+  onClick,
+}) {
+  const hasAlert = alert && Number(value) > 0
+  const Wrapper = onClick ? 'button' : 'div'
+  const visibleNames = names.slice(0, 3)
+  const hiddenCount = Math.max(0, names.length - visibleNames.length)
+
   return (
-    <div
-      className={`rounded-[1.5rem] border p-4 shadow-sm backdrop-blur-md ${
-        danger
-          ? 'border-rose-300 bg-rose-50/90 dark:border-rose-800 dark:bg-rose-950/45'
+    <Wrapper
+      {...(onClick ? { type: 'button', onClick } : {})}
+      className={`w-full rounded-[1.5rem] border p-4 text-left shadow-sm backdrop-blur-md transition ${
+        hasAlert
+          ? 'qa-alert-card border-yellow-500 bg-yellow-200/95 text-yellow-950 dark:border-yellow-400 dark:bg-yellow-500/25 dark:text-yellow-50'
           : 'border-amber-200 bg-white/72 dark:border-stone-700 dark:bg-stone-900/72'
-      }`}
+      } ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-yellow-300/70' : ''}`}
+      aria-label={onClick ? `${label}: ${value}. Open matching agents.` : undefined}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div
           className={`rounded-2xl p-3 ${
-            danger
-              ? 'bg-rose-900 text-white'
+            hasAlert
+              ? 'bg-yellow-600 text-white shadow-md'
               : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
           }`}
         >
           <Icon className="h-5 w-5" />
         </div>
-        <span className="text-2xl">✝️</span>
+
+        {hasAlert ? (
+          <span className="rounded-full bg-yellow-950 px-3 py-1 text-xs font-black uppercase tracking-wide text-yellow-100">
+            Click to view
+          </span>
+        ) : (
+          <span className="text-2xl">✝️</span>
+        )}
       </div>
 
-      <div className="mt-3 text-sm font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">
+      <div className={`mt-3 text-sm font-black uppercase tracking-widest ${hasAlert ? 'text-yellow-950 dark:text-yellow-100' : 'text-stone-500 dark:text-stone-400'}`}>
         {label}
       </div>
 
-      <div className="font-serif text-3xl font-black text-stone-900 dark:text-stone-50">
+      <div className={`font-serif text-3xl font-black ${hasAlert ? 'text-yellow-950 dark:text-white' : 'text-stone-900 dark:text-stone-50'}`}>
         {value}
       </div>
 
-      <div className="text-sm text-stone-600 dark:text-stone-300">{sub}</div>
-    </div>
+      <div className={`text-sm font-semibold ${hasAlert ? 'text-yellow-900 dark:text-yellow-100' : 'text-stone-600 dark:text-stone-300'}`}>
+        {sub}
+      </div>
+
+      {hasAlert && visibleNames.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {visibleNames.map((name) => (
+            <span
+              key={name}
+              className="rounded-full border border-yellow-700/40 bg-white/75 px-2.5 py-1 text-xs font-black text-yellow-950 shadow-sm dark:bg-yellow-950/45 dark:text-yellow-50"
+            >
+              {name}
+            </span>
+          ))}
+          {hiddenCount > 0 && (
+            <span className="rounded-full bg-yellow-950 px-2.5 py-1 text-xs font-black text-yellow-100">
+              +{hiddenCount} more
+            </span>
+          )}
+        </div>
+      )}
+    </Wrapper>
   )
 }
 
@@ -162,8 +204,38 @@ export default function App() {
 
   const csBelowKpi = rows.filter((row) => row.csBelowKpi).length
   const groupsBelowKpi = rows.filter((row) => row.groupBelowKpi).length
-  const under50 = rows.filter((row) => row.criticalUnder50).length
-  const specialCorrection = rows.filter((row) => row.specialCorrection).length
+  const under50Agents = rows
+    .filter((row) => row.criticalUnder50)
+    .sort((a, b) => (a.lowestScore ?? 101) - (b.lowestScore ?? 101))
+  const specialCorrectionAgents = rows
+    .filter((row) => row.specialCorrection)
+    .sort((a, b) => (a.lowestScore ?? 101) - (b.lowestScore ?? 101))
+  const under50 = under50Agents.length
+  const specialCorrection = specialCorrectionAgents.length
+  const hasGroupReviews = rows.some((row) => row.groupReviewCount > 0)
+
+  function openUnder50Agents() {
+    setFilters({ search: '', center: 'ALL', performance: 'UNDER_50' })
+    setActiveTab('agents')
+
+    window.setTimeout(() => {
+      document.getElementById('agent-dashboard')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }, 100)
+  }
+
+  function openSpecialCorrection() {
+    setActiveTab('special')
+
+    window.setTimeout(() => {
+      document.getElementById('special-correction')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }, 100)
+  }
 
   async function loadLive() {
     setLoading(true)
@@ -281,7 +353,7 @@ export default function App() {
             <NextPickWarning nextPickGroup={nextPickGroup} />
 
             <div className="rounded-[1.5rem] border border-emerald-300 bg-emerald-50/90 p-4 text-sm font-semibold text-emerald-950 shadow-sm backdrop-blur dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
-              Each agent appears once. CS and Groups scores are averaged separately across every saved review in Agents Reviwed. Anyone below 90% CS or 85% Groups stays exposed. An average below 50 plus 60 phone days triggers Special Correction.
+              Each agent appears once. CS exposure uses the agent's average across saved reviews. Any individual review below 50 is marked Critical. A review below 50 plus at least 60 phone days triggers Special Correction.
             </div>
 
             {error && (
@@ -304,7 +376,7 @@ export default function App() {
 
             {activeTab === 'overview' && (
               <>
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <div className={`grid gap-4 md:grid-cols-2 ${hasGroupReviews ? 'xl:grid-cols-5' : 'xl:grid-cols-4'}`}>
                   <Stat
                     icon={UsersRound}
                     label="Unique Agents"
@@ -312,10 +384,41 @@ export default function App() {
                     sub={lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Waiting for live data'}
                   />
 
-                  <Stat icon={Target} label="CS Below KPI" value={csBelowKpi} sub="Average below 90%" />
-                  <Stat icon={CalendarDays} label="Groups Below KPI" value={groupsBelowKpi} sub="Average below 85%" />
-                  <Stat icon={AlertTriangle} label="Under 50" value={under50} sub="Any average below 50" danger={under50 > 0} />
-                  <Stat icon={ShieldAlert} label="Special Correction" value={specialCorrection} sub="Under 50 + 60 phone days" danger={specialCorrection > 0} />
+                  <Stat
+                    icon={Target}
+                    label="CS Below KPI"
+                    value={csBelowKpi}
+                    sub="Average below 90%"
+                  />
+
+                  {hasGroupReviews && (
+                    <Stat
+                      icon={CalendarDays}
+                      label="Groups Below KPI"
+                      value={groupsBelowKpi}
+                      sub="Average below 85%"
+                    />
+                  )}
+
+                  <Stat
+                    icon={AlertTriangle}
+                    label="Under 50"
+                    value={under50}
+                    sub="Any individual review below 50"
+                    names={under50Agents.map((agent) => agent.agentName)}
+                    alert={under50 > 0}
+                    onClick={under50 > 0 ? openUnder50Agents : undefined}
+                  />
+
+                  <Stat
+                    icon={ShieldAlert}
+                    label="Special Correction"
+                    value={specialCorrection}
+                    sub="Review below 50 + 60 phone days"
+                    names={specialCorrectionAgents.map((agent) => agent.agentName)}
+                    alert={specialCorrection > 0}
+                    onClick={specialCorrection > 0 ? openSpecialCorrection : undefined}
+                  />
                 </div>
 
                 <div className="grid gap-5">

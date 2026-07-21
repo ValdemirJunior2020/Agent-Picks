@@ -18,7 +18,7 @@ export default function AgentTable({ rows, filters, setFilters }) {
   const filtered = filterRows(rows, filters)
 
   return (
-    <section className="rounded-[2rem] border border-amber-200 bg-stone-50/90 p-5 shadow-holy backdrop-blur dark:border-stone-700 dark:bg-stone-900/75">
+    <section id="agent-dashboard" className="scroll-mt-28 rounded-[2rem] border border-amber-200 bg-stone-50/90 p-5 shadow-holy backdrop-blur dark:border-stone-700 dark:bg-stone-900/75">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.25em] text-amber-800 dark:text-amber-200">
@@ -62,7 +62,7 @@ export default function AgentTable({ rows, filters, setFilters }) {
             <option value="BELOW_KPI">All below KPI</option>
             <option value="BAD_CS">CS average below 90</option>
             <option value="BAD_GROUP">Groups average below 85</option>
-            <option value="UNDER_50">Any average under 50</option>
+            <option value="UNDER_50">Any individual review under 50</option>
             <option value="SPECIAL">Special correction</option>
             <option value="PASSING">Meeting KPI</option>
           </select>

@@ -46,3 +46,38 @@ body {
     break-inside: avoid;
   }
 }
+
+@keyframes qa-warning-flash {
+  0%, 100% {
+    background-color: rgba(254, 240, 138, 0.96);
+    border-color: rgb(234, 179, 8);
+    box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.38);
+  }
+  50% {
+    background-color: rgba(250, 204, 21, 0.98);
+    border-color: rgb(161, 98, 7);
+    box-shadow: 0 0 0 10px rgba(250, 204, 21, 0.12);
+  }
+}
+
+@keyframes qa-warning-badge-flash {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.72; transform: scale(1.04); }
+}
+
+.qa-alert-card {
+  animation: qa-warning-flash 1.15s ease-in-out infinite;
+}
+
+.qa-alert-badge,
+.qa-special-agent-card {
+  animation: qa-warning-badge-flash 1.25s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qa-alert-card,
+  .qa-alert-badge,
+  .qa-special-agent-card {
+    animation: none;
+  }
+}
