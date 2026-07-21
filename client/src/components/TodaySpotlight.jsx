@@ -15,27 +15,27 @@ function buildSpotlightText(picks, nextMeeting) {
 
     if (pick.badCs) {
       lines.push(
-        `Bad CS: ${pick.badCs.agentName} | CS ${pick.badCs.csScore ?? 'N/A'} | Row ${pick.badCs.rowNumber}`
+        `CS Below KPI: ${pick.badCs.agentName} | Average ${pick.badCs.csAverage ?? 'N/A'}% | ${pick.badCs.totalReviews} review(s)`
       )
     }
 
     if (pick.meeting.csOnly) {
-      lines.push('Bad Group: TELUS is CS only')
+      lines.push('Groups: TELUS is CS only')
     } else if (pick.badGroup) {
       lines.push(
-        `Bad Group: ${pick.badGroup.agentName} | Group ${pick.badGroup.groupScore ?? 'N/A'} | Row ${pick.badGroup.rowNumber}`
+        `Groups Below KPI: ${pick.badGroup.agentName} | Average ${pick.badGroup.groupAverage ?? 'N/A'}% | ${pick.badGroup.totalReviews} review(s)`
       )
     }
 
     if (pick.bestGoodCs) {
       lines.push(
-        `Best Good CS: ${pick.bestGoodCs.agentName} | CS ${pick.bestGoodCs.csScore ?? 'N/A'} | Row ${pick.bestGoodCs.rowNumber}`
+        `Strong CS: ${pick.bestGoodCs.agentName} | Average ${pick.bestGoodCs.csAverage ?? 'N/A'}%`
       )
     }
 
     if (pick.bestGoodGroup) {
       lines.push(
-        `Best Good Group: ${pick.bestGoodGroup.agentName} | Group ${pick.bestGoodGroup.groupScore ?? 'N/A'} | Row ${pick.bestGoodGroup.rowNumber}`
+        `Strong Groups: ${pick.bestGoodGroup.agentName} | Average ${pick.bestGoodGroup.groupAverage ?? 'N/A'}%`
       )
     }
 
@@ -80,7 +80,7 @@ export default function TodaySpotlight({ picks = [], now = new Date(), nextMeeti
               </h2>
 
               <p className="mt-2 max-w-3xl text-sm text-amber-50/90">
-                A quick executive view for Barbara with the key risk picks, strong performers,
+                A quick executive view for Barbara with the below-KPI averages, correction priorities, strong performers,
                 and the next QA meeting focus.
               </p>
             </div>
@@ -160,31 +160,31 @@ export default function TodaySpotlight({ picks = [], now = new Date(), nextMeeti
                 </h3>
 
                 <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">
-                  {primaryPick.centerRowsCount ?? 0} agents reviewed for this center.
+                  {primaryPick.centerRowsCount ?? 0} unique agents calculated for this center.
                 </p>
               </div>
 
               <div className="grid gap-4 xl:grid-cols-2">
-                <AgentCard title="Main Bad CS Pick" agent={primaryPick.badCs} tone="red" />
+                <AgentCard title="CS Below-KPI Pick" agent={primaryPick.badCs} tone="red" />
 
                 {primaryPick.meeting.csOnly ? (
-                  <AgentCard title="Main Bad Group Pick" tone="neutral" note="TELUS is CS only." />
+                  <AgentCard title="Groups Below-KPI Pick" tone="neutral" note="TELUS is CS only." />
                 ) : (
-                  <AgentCard title="Main Bad Group Pick" agent={primaryPick.badGroup} tone="red" />
+                  <AgentCard title="Groups Below-KPI Pick" agent={primaryPick.badGroup} tone="red" />
                 )}
 
                 {primaryPick.bestGoodCs ? (
-                  <AgentCard title="Best Good CS Pick" agent={primaryPick.bestGoodCs} tone="green" />
+                  <AgentCard title="Strong CS Example" agent={primaryPick.bestGoodCs} tone="green" />
                 ) : (
-                  <AgentCard title="Best Good CS Pick" tone="neutral" note="No good CS agent found." />
+                  <AgentCard title="Strong CS Example" tone="neutral" note="No CS average at or above 90% was found." />
                 )}
 
                 {primaryPick.meeting.csOnly ? (
-                  <AgentCard title="Best Good Group Pick" tone="neutral" note="TELUS is CS only." />
+                  <AgentCard title="Strong Groups Example" tone="neutral" note="TELUS is CS only." />
                 ) : primaryPick.bestGoodGroup ? (
-                  <AgentCard title="Best Good Group Pick" agent={primaryPick.bestGoodGroup} tone="green" />
+                  <AgentCard title="Strong Groups Example" agent={primaryPick.bestGoodGroup} tone="green" />
                 ) : (
-                  <AgentCard title="Best Good Group Pick" tone="neutral" note="No good Group agent found." />
+                  <AgentCard title="Strong Groups Example" tone="neutral" note="No Groups average at or above 85% was found." />
                 )}
               </div>
 

@@ -2,93 +2,59 @@
 import { Clipboard, CalendarDays, FileDown } from 'lucide-react'
 import AgentCard from './AgentCard'
 
-function getPickValue(pick, primary, fallback) {
-  return pick?.[primary] || pick?.[fallback] || null
-}
-
-function cleanNoteText(text = '') {
-  return String(text)
-    .replaceAll('bad CS', 'CS review')
-    .replaceAll('bad Group', 'Group review')
-    .replaceAll('bad agent', 'review pick')
-    .replaceAll('Bad CS', 'CS Review')
-    .replaceAll('Bad Group', 'Group Review')
-    .replaceAll('Bad Agent', 'Review Pick')
-    .replaceAll('BAD CS', 'CS REVIEW')
-    .replaceAll('BAD GROUP', 'GROUP REVIEW')
-    .replaceAll('BAD AGENT', 'REVIEW PICK')
-    .replaceAll('bad', 'review')
-    .replaceAll('Bad', 'Review')
-    .replaceAll('BAD', 'REVIEW')
-}
-
 function buildAgentCopyLine(agent) {
   return [
     agent?.agentName || 'N/A',
+    agent?.center || 'N/A',
     agent?.startDate || 'N/A',
-    agent?.supervisor || 'N/A',
+    `CS Avg: ${agent?.csAverage ?? 'N/A'}`,
+    `Groups Avg: ${agent?.groupAverage ?? 'N/A'}`,
+    `Reviews: ${agent?.totalReviews ?? 0}`,
+    agent?.specialCorrection ? 'SPECIAL CORRECTION' : agent?.exposureLabel || '',
   ].join('\t')
 }
 
 function buildCopyText(pick) {
-  const csReview = getPickValue(pick, 'badCs', 'badCsAgent')
-  const groupReview = getPickValue(pick, 'badGroup', 'badGroupAgent')
-
   const selectedAgents = [
-    csReview,
-    pick?.meeting?.csOnly ? null : groupReview,
+    pick?.badCs,
+    pick?.meeting?.csOnly ? null : pick?.badGroup,
   ].filter(Boolean)
 
   const uniqueAgents = []
   const seen = new Set()
 
   selectedAgents.forEach((agent) => {
-    const key =
-      agent?.id ||
-      `${agent?.agentName}-${agent?.startDate}-${agent?.supervisor}`
-
-    if (!seen.has(key)) {
-      seen.add(key)
+    if (!seen.has(agent.id)) {
+      seen.add(agent.id)
       uniqueAgents.push(agent)
     }
   })
 
   const lines = [
-    'Here is the choice for the QA meeting today.',
+    'Here are the QA choices for this meeting.',
     '',
-    'Please provide the past three (3) QA scores with call IDs for each LOB for this agent.',
+    'Please provide the past three QA scores and call IDs for each selected agent when available.',
     '',
-    'Groups and CS Choices for the Day:',
+    `${pick.meeting.label}:`,
   ]
 
   if (!uniqueAgents.length) {
-    lines.push('No CS or Group choice found.')
+    lines.push('No below-KPI CS or Groups choice was found.')
     return lines.join('\n')
   }
 
-  uniqueAgents.forEach((agent) => {
-    lines.push(buildAgentCopyLine(agent))
-  })
-
+  uniqueAgents.forEach((agent) => lines.push(buildAgentCopyLine(agent)))
   return lines.join('\n')
 }
 
 export default function DayCard({ pick }) {
   if (!pick?.meeting) return null
 
-  const csReview = getPickValue(pick, 'badCs', 'badCsAgent')
-  const groupReview = getPickValue(pick, 'badGroup', 'badGroupAgent')
-  const strongCs = pick.bestGoodCs || pick.goodAgents?.[0] || null
-  const strongGroup = pick.bestGoodGroup || pick.goodAgents?.[1] || null
-
   const handleCopy = async () => {
-    const textToCopy = buildCopyText(pick)
-    await navigator.clipboard.writeText(textToCopy)
+    await navigator.clipboard.writeText(buildCopyText(pick))
   }
 
-  const handlePdf = () => {
-    window.print()
-  }
+  const handlePdf = () => window.print()
 
   return (
     <section className="rounded-[2rem] border border-amber-200 bg-stone-50/84 p-5 shadow-xl backdrop-blur-md dark:border-stone-700 dark:bg-stone-900/72">
@@ -104,7 +70,7 @@ export default function DayCard({ pick }) {
           </h2>
 
           <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">
-            {pick.centerRowsCount ?? pick.agentsCount ?? 0} records found from Google Sheets
+            {pick.centerRowsCount ?? 0} unique agents calculated from the Agents Reviwed tab
           </p>
         </div>
 
@@ -129,53 +95,45 @@ export default function DayCard({ pick }) {
 
       <div className="mt-5 grid gap-4 xl:grid-cols-2">
         <AgentCard
-          title="CS Review Pick"
-          agent={csReview}
+          title="CS Below-KPI Pick"
+          agent={pick.badCs}
           tone="red"
-          note="No CS review pick found."
+          note="No CS average below 90% was found."
         />
 
         {pick.meeting.csOnly ? (
-          <AgentCard
-            title="Group Review Pick"
-            tone="neutral"
-            note="TELUS is CS only."
-          />
+          <AgentCard title="Groups Below-KPI Pick" tone="neutral" note="TELUS is CS only." />
         ) : (
           <AgentCard
-            title="Group Review Pick"
-            agent={groupReview}
+            title="Groups Below-KPI Pick"
+            agent={pick.badGroup}
             tone="red"
-            note="No Group review pick found."
+            note="No Groups average below 85% was found."
           />
         )}
 
         <AgentCard
           title="Strong CS Example"
-          agent={strongCs}
+          agent={pick.bestGoodCs}
           tone="green"
-          note="No strong CS example found."
+          note="No CS average at or above 90% was found."
         />
 
         {pick.meeting.csOnly ? (
-          <AgentCard
-            title="Strong Group Example"
-            tone="neutral"
-            note="TELUS is CS only."
-          />
+          <AgentCard title="Strong Groups Example" tone="neutral" note="TELUS is CS only." />
         ) : (
           <AgentCard
-            title="Strong Group Example"
-            agent={strongGroup}
+            title="Strong Groups Example"
+            agent={pick.bestGoodGroup}
             tone="green"
-            note="No strong Group example found."
+            note="No Groups average at or above 85% was found."
           />
         )}
       </div>
 
       {pick.notes?.length > 0 && (
         <div className="mt-5 rounded-2xl border border-amber-300 bg-amber-100/80 p-4 text-sm font-semibold text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-          {cleanNoteText(pick.notes.join(' '))}
+          {pick.notes.join(' ')}
         </div>
       )}
     </section>

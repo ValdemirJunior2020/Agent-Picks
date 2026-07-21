@@ -1,49 +1,24 @@
 // client/src/components/AgentCard.jsx
-import { AlertTriangle, CheckCircle2, Info, CalendarClock } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Info, CalendarClock, Gauge } from 'lucide-react'
 
-function cleanTitle(title = '') {
-  return String(title)
-    .replaceAll('BAD CS AGENT', 'CS REVIEW PICK')
-    .replaceAll('BAD GROUP AGENT', 'GROUP REVIEW PICK')
-    .replaceAll('BAD AGENT', 'REVIEW PICK')
-    .replaceAll('BAD CS PICK', 'CS REVIEW PICK')
-    .replaceAll('BAD GROUP PICK', 'GROUP REVIEW PICK')
-    .replaceAll('MAIN BAD CS PICK', 'MAIN CS REVIEW PICK')
-    .replaceAll('MAIN BAD GROUP PICK', 'MAIN GROUP REVIEW PICK')
-    .replaceAll('BEST GOOD CS PICK', 'STRONG CS EXAMPLE')
-    .replaceAll('BEST GOOD GROUP PICK', 'STRONG GROUP EXAMPLE')
-    .replaceAll('Best Good CS Pick', 'Strong CS Example')
-    .replaceAll('Best Good Group Pick', 'Strong Group Example')
-    .replaceAll('Main Bad CS Pick', 'Main CS Review Pick')
-    .replaceAll('Main Bad Group Pick', 'Main Group Review Pick')
-    .replaceAll('Bad CS Agent', 'CS Review Pick')
-    .replaceAll('Bad Group Agent', 'Group Review Pick')
-    .replaceAll('Bad Agent', 'Review Pick')
-    .replaceAll('bad', 'review')
-    .replaceAll('Bad', 'Review')
-    .replaceAll('BAD', 'REVIEW')
+function scoreLabel(value) {
+  return value == null ? 'N/A' : `${value}%`
 }
 
-function getRotationBadgeClass(agent) {
-  if (!agent) return 'bg-stone-100 text-stone-800'
-
-  if (agent.reviewRotationStatus === 'nesting') {
-    return 'bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-100'
+function exposureBadgeClass(agent) {
+  if (agent?.specialCorrection) {
+    return 'bg-rose-800 text-white dark:bg-rose-700'
   }
 
-  if (agent.reviewRotationStatus === 'recently-reviewed') {
-    return 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100'
-  }
-
-  if (agent.reviewRotationStatus === 'checked-no-date') {
+  if (agent?.criticalUnder50) {
     return 'bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-100'
   }
 
-  if (agent.reviewRotationStatus === 'eligible-reviewed-before') {
-    return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100'
+  if (agent?.belowKpi) {
+    return 'bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-100'
   }
 
-  return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100'
+  return 'bg-emerald-100 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-100'
 }
 
 export default function AgentCard({ title, agent, tone = 'neutral', note }) {
@@ -76,109 +51,110 @@ export default function AgentCard({ title, agent, tone = 'neutral', note }) {
 
   const selected = styles[tone] || styles.neutral
   const Icon = tone === 'green' ? CheckCircle2 : tone === 'red' ? AlertTriangle : Info
-  const safeTitle = cleanTitle(title)
 
   if (!agent) {
     return (
       <div className={`rounded-2xl border p-4 ${selected.wrapper}`}>
         <div className="flex items-center gap-2">
           <Icon className={`h-4 w-4 ${selected.icon}`} />
-          <h4 className="font-black uppercase tracking-wide">{safeTitle}</h4>
+          <h4 className="font-black uppercase tracking-wide">{title}</h4>
         </div>
 
-        <p className="mt-3 text-sm opacity-80">
-          {note || 'No review pick found.'}
-        </p>
+        <p className="mt-3 text-sm opacity-80">{note || 'No agent found.'}</p>
       </div>
     )
   }
 
   return (
     <div className={`rounded-2xl border p-4 ${selected.wrapper}`}>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           <Icon className={`h-4 w-4 ${selected.icon}`} />
-          <h4 className="font-black uppercase tracking-wide">{safeTitle}</h4>
+          <h4 className="font-black uppercase tracking-wide">{title}</h4>
         </div>
 
         <span className={`rounded-full px-3 py-1 text-xs font-black ${selected.badge}`}>
-          Row {agent.rowNumber || 'N/A'}
+          {agent.totalReviews} review{agent.totalReviews === 1 ? '' : 's'}
         </span>
       </div>
 
-      <h3 className="mt-3 font-serif text-xl font-black">
-        {agent.agentName || 'Unknown Agent'}
-      </h3>
+      <h3 className="mt-3 font-serif text-xl font-black">{agent.agentName}</h3>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <span className={`rounded-full px-3 py-1 text-xs font-black ${exposureBadgeClass(agent)}`}>
+          {agent.exposureLabel}
+        </span>
+
+        {agent.specialCorrection && (
+          <span className="rounded-full bg-stone-950 px-3 py-1 text-xs font-black text-white dark:bg-white dark:text-stone-950">
+            Correction priority
+          </span>
+        )}
+      </div>
 
       <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
         <p>
-          <strong>CS:</strong> {agent.csScore ?? 'N/A'}{agent.csScore != null ? '%' : ''}
+          <strong>CS average:</strong> {scoreLabel(agent.csAverage)}
+          {agent.csReviewCount > 0 ? ` (${agent.csReviewCount})` : ''}
         </p>
 
         <p>
-          <strong>Group:</strong> {agent.groupScore ?? 'N/A'}{agent.groupScore != null ? '%' : ''}
+          <strong>Groups average:</strong> {scoreLabel(agent.groupAverage)}
+          {agent.groupReviewCount > 0 ? ` (${agent.groupReviewCount})` : ''}
         </p>
 
         <p>
-          <strong>Start:</strong> {agent.startDate || 'N/A'}
+          <strong>Phone start:</strong> {agent.startDate}
         </p>
 
         <p>
-          <strong>Supervisor:</strong> {agent.supervisor || 'N/A'}
+          <strong>Days on phones:</strong> {agent.daysOnPhones ?? 'N/A'}
         </p>
       </div>
 
       <div className={`mt-4 rounded-xl border p-3 text-sm ${selected.dateBox}`}>
         <div className="flex items-center gap-2 font-black">
           <CalendarClock className="h-4 w-4" />
-          Review Rotation
+          Review summary
         </div>
 
-        <div className="mt-2 grid gap-2">
-          <span className={`w-fit rounded-full px-3 py-1 text-xs font-black ${getRotationBadgeClass(agent)}`}>
-            {agent.reviewRotationLabel || 'Never Reviewed — Eligible'}
-          </span>
-
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
           <p>
-            <strong>Reviewed Checkbox:</strong>{' '}
-            {agent.isReviewedChecked ? 'Checked' : 'Not checked'}
+            <strong>Last reviewed:</strong> {agent.lastReviewLabel}
           </p>
 
           <p>
-            <strong>Last Reviewed:</strong>{' '}
-            {agent.lastReviewLabel || 'No previous review found'}
+            <strong>Latest call ID:</strong> {agent.latestCallId || 'N/A'}
           </p>
 
           <p>
-            <strong>Eligible Again:</strong>{' '}
-            {agent.eligibleAgainLabel || 'Available now'}
+            <strong>Call center:</strong> {agent.callCenters.join(', ') || agent.center}
           </p>
 
-          {agent.daysSinceLastReview != null && (
-            <p>
-              <strong>Days Since Review:</strong> {agent.daysSinceLastReview}
-            </p>
-          )}
-
-          {agent.daysSinceStart != null && (
-            <p>
-              <strong>Days Since Start:</strong> {agent.daysSinceStart}
-            </p>
-          )}
-
-          <p className="rounded-lg bg-white/65 px-3 py-2 text-xs font-semibold dark:bg-stone-950/35">
-            {agent.reviewRotationReason || 'No previous review found — eligible for QA rotation.'}
+          <p>
+            <strong>Latest evaluator:</strong> {agent.evaluator || 'N/A'}
           </p>
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl bg-white/55 p-3 text-sm dark:bg-stone-950/35">
-        {agent.notes || agent.fullText || 'No notes available.'}
-      </div>
+      {agent.specialCorrection && (
+        <div className="mt-4 rounded-xl bg-rose-900 p-3 text-sm font-bold text-white">
+          <div className="flex items-start gap-2">
+            <Gauge className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Average under 50 and at least 60 days on the phones. This agent needs special exposure for correction.
+            </span>
+          </div>
+        </div>
+      )}
 
-      <p className="mt-3 text-xs opacity-75">
-        Source: {agent.sourceSheet || agent.sheetName || 'N/A'}
-      </p>
+      {agent.notes && (
+        <div className="mt-4 rounded-xl bg-white/55 p-3 text-sm dark:bg-stone-950/35">
+          {agent.notes}
+        </div>
+      )}
+
+      <p className="mt-3 text-xs opacity-75">Source: Agents Reviwed</p>
     </div>
   )
 }

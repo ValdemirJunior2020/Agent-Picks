@@ -1,17 +1,18 @@
 // client/src/App.jsx
-import FloatingMusicPlayer from './components/FloatingMusicPlayer'
 import { useEffect, useMemo, useState } from 'react'
 import {
+  AlertTriangle,
   CalendarDays,
+  Cross,
   Moon,
   RefreshCcw,
   Settings,
+  ShieldAlert,
   Sun,
   Table2,
+  Target,
+  UsersRound,
   Wheat,
-  Cross,
-  ShieldCheck,
-  AlertTriangle,
 } from 'lucide-react'
 import { fetchAgentRows } from './lib/api'
 import {
@@ -26,46 +27,28 @@ import AgentTable from './components/AgentTable'
 import TodaySpotlight from './components/TodaySpotlight'
 import NextPickWarning from './components/NextPickWarning'
 import SmileOfTheDay from './components/SmileOfTheDay'
-import UnderProbation from './components/UnderProbation'
+import SpecialCorrection from './components/SpecialCorrection'
 
 const QA_DAYS = ['Tuesday', 'Wednesday', 'Thursday', 'Friday']
+const emptyPayload = { success: true, reviews: [] }
 
-const demoPayload = {
-  success: true,
-  rows: [
-    {
-      sheetName: 'TEP QA',
-      rowNumber: 57,
-      values: ['Rhea May Primavera', 'W20 2/17/2025', 'Ginette Salvio', true, 'CS/35 needs work'],
-    },
-    {
-      sheetName: 'TELUS',
-      rowNumber: 12,
-      values: ['Maria Santos', 'W24 6/1/2026', 'Barbara Kalchik', true, 'CS/82 TS needs coaching'],
-    },
-    {
-      sheetName: 'BUW QA',
-      rowNumber: 65,
-      values: ['Merliz Signey De Paz', 'W18 11/24/2024', 'Nicole C Demafelix', true, 'G/50 CS/50'],
-    },
-    {
-      sheetName: 'WNS QA',
-      rowNumber: 22,
-      values: ['Ana Cruz', 'W25 9/22/2025', 'WNS Sup', true, 'G/78 CS/92 Questioning on Schedule'],
-    },
-    {
-      sheetName: 'CON QA',
-      rowNumber: 78,
-      values: ['James Eduard Balandra', 'W17 11/10/2024', 'Norte, Christine Ann C', true, 'G/50 CS/16'],
-    },
-  ],
-}
-
-function Stat({ icon: Icon, label, value, sub }) {
+function Stat({ icon: Icon, label, value, sub, danger = false }) {
   return (
-    <div className="rounded-[1.5rem] border border-amber-200 bg-white/72 p-4 shadow-sm backdrop-blur-md dark:border-stone-700 dark:bg-stone-900/72">
+    <div
+      className={`rounded-[1.5rem] border p-4 shadow-sm backdrop-blur-md ${
+        danger
+          ? 'border-rose-300 bg-rose-50/90 dark:border-rose-800 dark:bg-rose-950/45'
+          : 'border-amber-200 bg-white/72 dark:border-stone-700 dark:bg-stone-900/72'
+      }`}
+    >
       <div className="flex items-center justify-between">
-        <div className="rounded-2xl bg-amber-100 p-3 text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+        <div
+          className={`rounded-2xl p-3 ${
+            danger
+              ? 'bg-rose-900 text-white'
+              : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
+          }`}
+        >
           <Icon className="h-5 w-5" />
         </div>
         <span className="text-2xl">✝️</span>
@@ -86,7 +69,6 @@ function Stat({ icon: Icon, label, value, sub }) {
 
 function timeToMinutes(timeString = '') {
   const match = String(timeString).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
-
   if (!match) return 0
 
   let hour = Number(match[1])
@@ -112,14 +94,13 @@ function getDayPriority(dayName, currentDayName) {
 export default function App() {
   const [activeTab, setActiveTab] = useState('overview')
   const [dark, setDark] = useState(false)
-  const [payload, setPayload] = useState(demoPayload)
+  const [payload, setPayload] = useState(emptyPayload)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState(null)
   const [filters, setFilters] = useState({
     search: '',
     center: 'ALL',
-    supervisor: 'ALL',
     performance: 'ALL',
   })
   const [now, setNow] = useState(new Date())
@@ -133,7 +114,7 @@ export default function App() {
     return () => clearInterval(timer)
   }, [])
 
-  const rows = useMemo(() => normalizeRows(payload), [payload])
+  const rows = useMemo(() => normalizeRows(payload, now), [payload, now])
   const picks = useMemo(() => generatePicks(rows), [rows])
   const nextMeeting = getNextMeeting(now)
   const nextPickGroup = getNextPickGroup(now)
@@ -147,16 +128,10 @@ export default function App() {
 
   const orderedQaPicks = useMemo(() => {
     return [...qaPicks].sort((a, b) => {
-      const aDay = a?.meeting?.dayName || a?.meeting?.day || ''
-      const bDay = b?.meeting?.dayName || b?.meeting?.day || ''
+      const aDayPriority = getDayPriority(a?.meeting?.dayName || '', currentDayName)
+      const bDayPriority = getDayPriority(b?.meeting?.dayName || '', currentDayName)
 
-      const aDayPriority = getDayPriority(aDay, currentDayName)
-      const bDayPriority = getDayPriority(bDay, currentDayName)
-
-      if (aDayPriority !== bDayPriority) {
-        return aDayPriority - bDayPriority
-      }
-
+      if (aDayPriority !== bDayPriority) return aDayPriority - bDayPriority
       return timeToMinutes(a?.meeting?.time || '') - timeToMinutes(b?.meeting?.time || '')
     })
   }, [qaPicks, currentDayName])
@@ -166,20 +141,12 @@ export default function App() {
       (pick) => pick.meeting.dayName === currentDayName
     )
 
-    if (todaysRealQaMeetings.length > 0) {
-      return todaysRealQaMeetings
-    }
+    if (todaysRealQaMeetings.length > 0) return todaysRealQaMeetings
 
     if (nextPickGroup?.meetings?.length) {
-      const nextGroupLabels = nextPickGroup.meetings.map((meeting) => meeting.label)
-
-      const nextGroupPicks = qaPicks.filter((pick) =>
-        nextGroupLabels.includes(pick.meeting.label)
-      )
-
-      if (nextGroupPicks.length > 0) {
-        return nextGroupPicks
-      }
+      const nextLabels = nextPickGroup.meetings.map((meeting) => meeting.label)
+      const nextGroupPicks = qaPicks.filter((pick) => nextLabels.includes(pick.meeting.label))
+      if (nextGroupPicks.length > 0) return nextGroupPicks
     }
 
     if (!nextMeeting) return []
@@ -193,18 +160,10 @@ export default function App() {
     return fallback ? [fallback] : []
   }, [qaPicks, currentDayName, nextPickGroup, nextMeeting])
 
-  const csReviewNeeded = rows.filter((row) => row.csScore != null && row.csScore < 90).length
-
-  const groupReviewNeeded = rows.filter(
-    (row) => row.groupScore != null && row.groupScore < 85
-  ).length
-
-  const strongExamples = rows.filter(
-    (row) =>
-      (row.csScore == null || row.csScore >= 90) &&
-      (row.groupScore == null || row.groupScore >= 85) &&
-      !row.riskWords
-  ).length
+  const csBelowKpi = rows.filter((row) => row.csBelowKpi).length
+  const groupsBelowKpi = rows.filter((row) => row.groupBelowKpi).length
+  const under50 = rows.filter((row) => row.criticalUnder50).length
+  const specialCorrection = rows.filter((row) => row.specialCorrection).length
 
   async function loadLive() {
     setLoading(true)
@@ -214,9 +173,9 @@ export default function App() {
       const data = await fetchAgentRows()
       setPayload(data)
       setLastUpdated(new Date())
-    } catch (err) {
-      setError(err.message)
-      setPayload(demoPayload)
+    } catch (requestError) {
+      setError(requestError.message)
+      setPayload(emptyPayload)
     } finally {
       setLoading(false)
     }
@@ -229,7 +188,7 @@ export default function App() {
   const tabs = [
     { id: 'overview', label: 'Whole Week Picks', icon: CalendarDays },
     { id: 'daily', label: "Today's Picks", icon: Wheat },
-    { id: 'probation', label: 'Under Probation', icon: AlertTriangle },
+    { id: 'special', label: 'Special Correction', icon: ShieldAlert },
     { id: 'agents', label: 'All Agents', icon: Table2 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ]
@@ -242,8 +201,6 @@ export default function App() {
           'linear-gradient(90deg, rgba(255,251,235,.66), rgba(255,247,237,.42), rgba(236,253,245,.32)), url("/bg.png")',
       }}
     >
-      <FloatingMusicPlayer />
-
       <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,.18),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(159,18,57,.10),transparent_40%)] dark:bg-[linear-gradient(90deg,rgba(28,25,23,.88),rgba(41,37,36,.72))]">
         <header className="sticky top-0 z-40 border-b border-amber-200/80 bg-stone-50/74 backdrop-blur-xl dark:border-stone-700 dark:bg-stone-950/72">
           <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
@@ -253,11 +210,9 @@ export default function App() {
               </div>
 
               <div>
-                <h1 className="font-serif text-3xl font-black leading-none">
-                  Agent Picks
-                </h1>
+                <h1 className="font-serif text-3xl font-black leading-none">Agent Picks</h1>
                 <p className="text-sm font-semibold text-stone-600 dark:text-stone-300">
-                  QA Call Center Tool for Barbara Kalchik • Review picks, not agent labels.
+                  Weekly QA picks based only on averages from the Agents Reviwed tab.
                 </p>
               </div>
             </div>
@@ -276,6 +231,7 @@ export default function App() {
               <button
                 onClick={() => setDark(!dark)}
                 className="rounded-full border border-amber-200 bg-white/80 p-2 dark:border-stone-700 dark:bg-stone-900"
+                aria-label="Toggle dark mode"
               >
                 {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </button>
@@ -287,10 +243,8 @@ export default function App() {
           <aside className="h-fit rounded-[2rem] border border-amber-200 bg-stone-50/76 p-3 shadow-xl backdrop-blur-md dark:border-stone-700 dark:bg-stone-900/72">
             <div className="mb-3 rounded-[1.5rem] bg-gradient-to-br from-amber-800 to-rose-800 p-4 text-white">
               <div className="text-2xl">🕊️</div>
-              <p className="font-serif text-xl font-black">Warm QA View</p>
-              <p className="text-sm opacity-90">
-                Smart review picks from your Google Sheet.
-              </p>
+              <p className="font-serif text-xl font-black">Average-Based QA</p>
+              <p className="text-sm opacity-90">CS KPI 90% • Groups KPI 85%</p>
             </div>
 
             <nav className="space-y-2">
@@ -300,8 +254,8 @@ export default function App() {
                   onClick={() => setActiveTab(id)}
                   className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-bold transition ${
                     activeTab === id
-                      ? id === 'probation'
-                        ? 'bg-rose-700 text-white shadow'
+                      ? id === 'special'
+                        ? 'bg-rose-800 text-white shadow'
                         : 'bg-amber-800 text-white shadow'
                       : 'hover:bg-amber-100 dark:hover:bg-stone-800'
                   }`}
@@ -324,78 +278,49 @@ export default function App() {
 
           <section className="space-y-5">
             <SmileOfTheDay />
-
             <NextPickWarning nextPickGroup={nextPickGroup} />
 
             <div className="rounded-[1.5rem] border border-emerald-300 bg-emerald-50/90 p-4 text-sm font-semibold text-emerald-950 shadow-sm backdrop-blur dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
-              This tool does not label agents as bad. It identifies calls or QA records that may need review.
-              A low score may reflect one specific call issue, not the agent’s overall performance.
+              Each agent appears once. CS and Groups scores are averaged separately across every saved review in Agents Reviwed. Anyone below 90% CS or 85% Groups stays exposed. An average below 50 plus 60 phone days triggers Special Correction.
             </div>
 
             {error && (
               <div className="rounded-2xl border border-rose-300 bg-rose-50/88 p-4 font-semibold text-rose-900 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-100">
-                Live sheet not connected yet: {error}. Showing demo data until your Apps Script URL is added.
+                The live Google Sheet could not be loaded: {error}. No old-source or demo agents are being shown.
               </div>
             )}
 
             {loading && (
               <div className="rounded-2xl border border-amber-300 bg-amber-100/90 p-4 font-bold text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-                ✨ Reading Google Sheets, checking KPI scores, scanning notes, and preparing Barbara&apos;s review picks...
+                Reading Agents Reviwed, calculating averages, and preparing the weekly picks...
               </div>
             )}
 
             {activeTab === 'daily' && (
-              <TodaySpotlight
-                picks={todaysPicks}
-                now={now}
-                nextMeeting={nextMeeting}
-              />
+              <TodaySpotlight picks={todaysPicks} now={now} nextMeeting={nextMeeting} />
             )}
 
-            {activeTab === 'probation' && <UnderProbation />}
+            {activeTab === 'special' && <SpecialCorrection rows={rows} />}
 
             {activeTab === 'overview' && (
               <>
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                   <Stat
-                    icon={ShieldCheck}
-                    label="Rows Loaded"
+                    icon={UsersRound}
+                    label="Unique Agents"
                     value={rows.length}
-                    sub={
-                      lastUpdated
-                        ? `Updated ${lastUpdated.toLocaleTimeString()}`
-                        : 'Demo/live data'
-                    }
+                    sub={lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Waiting for live data'}
                   />
 
-                  <Stat
-                    icon={CalendarDays}
-                    label="CS Review Needed"
-                    value={csReviewNeeded}
-                    sub="CS records below 90%"
-                  />
-
-                  <Stat
-                    icon={Wheat}
-                    label="Group Review Needed"
-                    value={groupReviewNeeded}
-                    sub="Group records below 85%"
-                  />
-
-                  <Stat
-                    icon={Cross}
-                    label="Strong Examples"
-                    value={strongExamples}
-                    sub="Green highlight candidates"
-                  />
+                  <Stat icon={Target} label="CS Below KPI" value={csBelowKpi} sub="Average below 90%" />
+                  <Stat icon={CalendarDays} label="Groups Below KPI" value={groupsBelowKpi} sub="Average below 85%" />
+                  <Stat icon={AlertTriangle} label="Under 50" value={under50} sub="Any average below 50" danger={under50 > 0} />
+                  <Stat icon={ShieldAlert} label="Special Correction" value={specialCorrection} sub="Under 50 + 60 phone days" danger={specialCorrection > 0} />
                 </div>
 
                 <div className="grid gap-5">
                   {orderedQaPicks.map((pick) => (
-                    <DayCard
-                      key={`${pick.meeting.dayName}-${pick.meeting.label}`}
-                      pick={pick}
-                    />
+                    <DayCard key={`${pick.meeting.dayName}-${pick.meeting.label}`} pick={pick} />
                   ))}
                 </div>
               </>
@@ -411,49 +336,24 @@ export default function App() {
                   ⚙️ Settings
                 </p>
 
-                <h2 className="font-serif text-3xl font-black">
-                  Google Sheet Connection
-                </h2>
+                <h2 className="font-serif text-3xl font-black">Google Sheet Connection</h2>
 
                 <div className="mt-5 space-y-4 text-sm leading-7 text-stone-700 dark:text-stone-200">
                   <p>
-                    <strong>1.</strong> Open{' '}
-                    <code className="rounded bg-amber-100 px-2 py-1 dark:bg-stone-800">
-                      apps-script/code.gs
-                    </code>
-                    , paste it into Apps Script, and deploy as a Web App.
+                    <strong>1.</strong> Replace your existing Apps Script with the full updated{' '}
+                    <code className="rounded bg-amber-100 px-2 py-1 dark:bg-stone-800">apps-script/code.gs</code>. It keeps the QA form and adds the read-only dashboard API.
                   </p>
 
                   <p>
-                    <strong>2.</strong> Create{' '}
-                    <code className="rounded bg-amber-100 px-2 py-1 dark:bg-stone-800">
-                      client/.env
-                    </code>{' '}
-                    from{' '}
-                    <code className="rounded bg-amber-100 px-2 py-1 dark:bg-stone-800">
-                      .env.example
-                    </code>
-                    .
+                    <strong>2.</strong> Deploy the Apps Script as a Web App and copy its <code className="rounded bg-amber-100 px-2 py-1 dark:bg-stone-800">/exec</code> URL.
                   </p>
 
                   <p>
-                    <strong>3.</strong> Set{' '}
-                    <code className="rounded bg-amber-100 px-2 py-1 dark:bg-stone-800">
-                      VITE_APPS_SCRIPT_URL
-                    </code>{' '}
-                    and{' '}
-                    <code className="rounded bg-amber-100 px-2 py-1 dark:bg-stone-800">
-                      VITE_AGENT_PICKS_API_KEY
-                    </code>
-                    .
+                    <strong>3.</strong> Create <code className="rounded bg-amber-100 px-2 py-1 dark:bg-stone-800">client/.env</code> from <code className="rounded bg-amber-100 px-2 py-1 dark:bg-stone-800">client/.env.example</code> and add the deployment URL and matching API key.
                   </p>
 
                   <p>
-                    <strong>4.</strong> Your background image must stay here:
-                    <br />
-                    <code className="rounded bg-amber-100 px-2 py-1 dark:bg-stone-800">
-                      client/public/bg.png
-                    </code>
+                    <strong>4.</strong> The only agent source used by this app is the <strong>Agents Reviwed</strong> tab in spreadsheet <code className="rounded bg-amber-100 px-2 py-1 dark:bg-stone-800">1GpR3siePgY45jGJfsAB2Q1obCW34A-tfKJOrI8ruEwg</code>.
                   </p>
                 </div>
               </section>
